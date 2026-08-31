@@ -1,9 +1,13 @@
+import type { ReactNode } from 'react';
+
 export function EmptyState({
   title,
   detail,
+  action,
 }: {
   title: string;
   detail: string;
+  action?: ReactNode;
 }) {
   return (
     <div className="empty">
@@ -16,6 +20,7 @@ export function EmptyState({
       </svg>
       <strong>{title}</strong>
       <span>{detail}</span>
+      {action}
     </div>
   );
 }

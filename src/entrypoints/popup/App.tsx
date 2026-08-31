@@ -123,7 +123,7 @@ export default function App() {
           打开页架
         </button>
       </div>
-      <div className="stack" style={{ paddingBottom: 0 }}>
+      <div className="stack">
         <TabBar
           tabs={[
             { id: 'shelf', label: '保藏' },
@@ -132,15 +132,11 @@ export default function App() {
           value={tab}
           onChange={(id) => setTab(id as 'shelf' | 'vault')}
         />
-      </div>
 
       {tab === 'vault' ? (
-        <div className="stack">
-          <PopupVault />
-        </div>
+        <PopupVault />
       ) : (
       <>
-      <div className="stack">
         <div className="card preview">
           <Favicon src={previewFavicon} title={previewTitle} url={previewUrl} />
           <div className="preview-body">
@@ -176,8 +172,12 @@ export default function App() {
         {bookmark && (phase === 'done' || (phase === 'idle' && existing)) && (
           <BookmarkEditor bookmark={bookmark} onChange={setBookmark} />
         )}
+      </>
+      )}
       </div>
 
+      {tab === 'shelf' && (
+      <>
       <div className="footer-links">
         <button type="button" className="icon-btn" onClick={() => setShowSettings((v) => !v)}>
           {showSettings ? '收起设置' : 'AI 设置'}

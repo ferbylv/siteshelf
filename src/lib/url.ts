@@ -70,3 +70,20 @@ export function hostnameOf(raw: string): string {
     return raw;
   }
 }
+
+/** Accept a pasted http(s) URL, adding https:// when the scheme is omitted. */
+export function parseHttpUrl(raw: string): URL | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const tryParse = (value: string): URL | null => {
+    try {
+      const url = new URL(value);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+      if (!url.hostname) return null;
+      return url;
+    } catch {
+      return null;
+    }
+  };
+  return tryParse(trimmed) ?? tryParse(`https://${trimmed}`);
+}

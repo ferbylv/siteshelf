@@ -107,25 +107,25 @@ export function PopupVault() {
   }
   if (gate === 'setup') {
     return (
-      <div className="stack" style={{ padding: 0 }}>
+      <>
         {pendingBanner}
         <SetupForm onReady={() => void reload()} />
-      </div>
+      </>
     );
   }
   if (gate === 'locked') {
     return (
-      <div className="stack" style={{ padding: 0 }}>
+      <>
         {pendingBanner}
         <UnlockForm onReady={() => void reload()} />
-      </div>
+      </>
     );
   }
 
   const page = parsePageTarget(tabUrl);
 
   return (
-    <div className="stack" style={{ padding: 0 }}>
+    <>
       {pendingBanner}
 
       <div className="card preview">
@@ -178,7 +178,7 @@ export function PopupVault() {
           锁定
         </button>
       </div>
-    </div>
+    </>
   );
 }
 

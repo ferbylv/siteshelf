@@ -110,24 +110,24 @@ export function VaultLibrary() {
 
   if (gate === 'setup') {
     return (
-      <div className="stack" style={{ padding: 0 }}>
+      <>
         {pendingBanner}
         <SetupForm onReady={() => void reloadGate()} />
-      </div>
+      </>
     );
   }
   if (gate === 'locked') {
     return (
-      <div className="stack" style={{ padding: 0 }}>
+      <>
         {pendingBanner}
         <UnlockForm onReady={() => void reloadGate()} />
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="stack" style={{ padding: 0 }}>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
+    <>
+      <div className="toolbar-row">
         <span className="muted">{items.length} 条登录</span>
         <div className="row">
           <button type="button" className="ghost-btn" onClick={() => setEditing('new')}>
@@ -292,6 +292,6 @@ export function VaultLibrary() {
         </button>
         {showChange && <ChangePasswordForm />}
       </div>
-    </div>
+    </>
   );
 }

@@ -61,31 +61,41 @@ const STYLE = `
   font: inherit; background: #fff;
 }
 .infobar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647;
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 10px 16px 12px;
+  position: fixed; top: 12px; right: 12px; left: auto; z-index: 2147483647;
+  width: 360px; max-width: calc(100vw - 24px);
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px 14px;
   background: #1a1510; color: #fffaf2;
-  border-bottom: 3px solid #ffd54a;
-  box-shadow: 0 8px 28px rgba(0,0,0,.42);
+  border: 1px solid #3d352c; border-bottom: 3px solid #ffd54a;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.45);
 }
+.infobar-head { display: flex; align-items: center; gap: 8px; }
 .infobar-mark {
   flex: 0 0 auto; background: #ffd54a; color: #1a1510;
-  font-weight: 800; font-size: 12px; letter-spacing: .04em;
-  border-radius: 8px; padding: 6px 8px;
+  font-weight: 800; font-size: 11px; letter-spacing: .04em;
+  border-radius: 6px; padding: 3px 6px;
 }
-.infobar-body { flex: 1 1 220px; min-width: 0; }
-.infobar h2 { margin: 0 0 2px; font-size: 15px; color: #fff; font-weight: 750; }
-.infobar .muted { color: #f0e4d2; margin: 0; font-size: 12.5px; }
-.infobar .field { margin: 6px 0 0; max-width: 280px; }
+.infobar h2 { margin: 0; font-size: 14px; color: #fff; font-weight: 750; }
+.infobar .muted { color: #f0e4d2; margin: 0; font-size: 12px; }
+.infobar .field { margin: 0; }
 .infobar .field label { color: #e8dcc8; }
-.infobar .field input { background: #fff; color: #1a1510; border-color: #ffd54a; }
-.infobar .row { margin-top: 0; margin-left: auto; }
+.infobar .field input {
+  background: #26211b; color: #fffaf2; border-color: #3d352c; padding: 6px 8px;
+}
+.infobar .row { margin-top: 4px; justify-content: flex-end; }
 .infobar .primary {
-  background: #ffd54a; color: #1a1510; font-weight: 800; padding: 10px 16px;
+  background: #ffd54a; color: #1a1510; font-weight: 800; padding: 8px 14px;
 }
 .infobar .ghost {
   background: transparent; border: 1px solid #e8dcc8; color: #fffaf2;
 }
+.infobar .kv {
+  display: flex; justify-content: space-between; gap: 8px;
+  margin: 0; font-size: 12px; color: #f0e4d2;
+}
+.infobar .kv span:last-child { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.infobar .muted:empty { display: none; }
 `;
 
 export default defineContentScript({
@@ -197,7 +207,7 @@ let didAutoFill = false;
 
 async function refresh(shadow: ShadowRoot): Promise<void> {
   // Always restore pending save UI, even when this document has no login form
-  // (typical after a redirect). renderIdle must not wipe an existing infobar.
+  // (typical after a redirect). renderIdle must not wipe an existing save card.
   if (findLoginForm()) {
     const result = await queryVault();
     if (result.unlocked && result.autoFill && result.matches[0] && !didAutoFill) {
@@ -467,24 +477,34 @@ function showSavePrompt(shadow: ShadowRoot, pending: Omit<PendingSave, 'tabId'>)
   bar.setAttribute('role', 'dialog');
   bar.setAttribute('aria-live', 'polite');
 
+  const head = document.createElement('div');
+  head.className = 'infobar-head';
   const mark = document.createElement('div');
   mark.className = 'infobar-mark';
   mark.textContent = '页架';
-
-  const body = document.createElement('div');
-  body.className = 'infobar-body';
   const h = document.createElement('h2');
   h.textContent = '保存到页架？';
-  const p = document.createElement('p');
-  p.className = 'muted';
+  head.append(mark, h);
+
+  const origin = document.createElement('p');
+  origin.className = 'muted';
   const landing =
     location.origin !== pending.origin ? ` · 当前页 ${location.host}` : '';
-  p.textContent = `将保存为 ${pending.origin}（${pending.host}）${landing}`;
+  origin.textContent = `${pending.origin}${landing}`;
+
   const userField = labeledInput('用户名', pending.username);
+
   const passLine = document.createElement('p');
-  passLine.className = 'muted';
-  passLine.textContent = `密码 ${'••••••••'}${httpWarn ? ` · ${httpWarn}` : ''}`;
-  body.append(h, p, userField.wrap, passLine);
+  passLine.className = 'kv';
+  const passLab = document.createElement('span');
+  passLab.textContent = '密码';
+  const passVal = document.createElement('span');
+  passVal.textContent = '••••••••';
+  passLine.append(passLab, passVal);
+
+  const note = document.createElement('p');
+  note.className = 'muted';
+  if (httpWarn) note.textContent = httpWarn;
 
   const row = document.createElement('div');
   row.className = 'row';
@@ -504,13 +524,13 @@ function showSavePrompt(shadow: ShadowRoot, pending: Omit<PendingSave, 'tabId'>)
       }
       saveBtn.disabled = false;
       if (res?.needsUnlock) {
-        passLine.textContent = '登录已记在本机会话中。请点击工具栏「页架」解锁后再保存。不会自动写入。';
+        note.textContent = '登录已记在本机会话中。请点击工具栏「页架」解锁后再保存。不会自动写入。';
       } else {
-        passLine.textContent = '未保存。请解锁保险库后再试。页架不会在未确认时保存密码。';
+        note.textContent = '未保存。请解锁保险库后再试。页架不会在未确认时保存密码。';
       }
     } catch {
       saveBtn.disabled = false;
-      passLine.textContent = '未保存。请稍后重试。';
+      note.textContent = '未保存。请稍后重试。';
     }
   });
   row.append(
@@ -521,7 +541,7 @@ function showSavePrompt(shadow: ShadowRoot, pending: Omit<PendingSave, 'tabId'>)
       bar.remove();
     }),
   );
-  bar.append(mark, body, row);
+  bar.append(head, origin, userField.wrap, passLine, note, row);
   wrapOf(shadow).prepend(bar);
 }
 
