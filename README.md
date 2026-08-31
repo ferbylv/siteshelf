@@ -124,6 +124,10 @@ Chrome 138+ 在满足设备要求时可使用内置 LanguageModel（Gemini Nano�
 
 WXT + React + TypeScript，Manifest V3。保险库使用 Web Crypto：AES-256-GCM + PBKDF2-SHA-256（600,000 次）。
 
+## 隐私
+
+详见 [PRIVACY.md](PRIVACY.md)。
+
 ## 许可证
 
 MIT
