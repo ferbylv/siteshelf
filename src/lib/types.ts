@@ -13,7 +13,9 @@ export const CATEGORIES = [
 
 export const UNCATEGORIZED = '未分类';
 
-export type Category = (typeof CATEGORIES)[number] | typeof UNCATEGORIZED;
+export const DEFAULT_CATEGORIES: readonly string[] = CATEGORIES;
+
+export type Category = string;
 
 export interface PageMetadata {
   url: string;

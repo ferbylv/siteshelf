@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RestoreBackup } from './RestoreBackup';
 import { unlockVault, VaultError } from '../../lib/vault/service';
 
 export function UnlockForm({ onReady }: { onReady: () => void }) {
@@ -48,6 +49,7 @@ export function UnlockForm({ onReady }: { onReady: () => void }) {
       >
         {busy ? '正在派生密钥…' : '解锁'}
       </button>
+      <RestoreBackup onRestored={onReady} />
     </div>
   );
 }

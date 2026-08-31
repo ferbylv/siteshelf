@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EmptyState } from '../EmptyState';
 import { Favicon } from '../Favicon';
 import { ChangePasswordForm } from './ChangePasswordForm';
+import { VaultImex } from './VaultImex';
 import { LoginEditor } from './LoginEditor';
 import { PendingSaveBanner } from './PendingSaveBanner';
 import { SetupForm } from './SetupForm';
@@ -148,6 +149,7 @@ export function VaultLibrary() {
 
       {pendingBanner}
 
+      <VaultImex onChanged={() => void reloadGate()} />
 
       <input
         className="search-input"

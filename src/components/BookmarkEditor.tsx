@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { BookmarkVaultSave } from './BookmarkVaultSave';
 import { CategoryChips } from './CategoryChips';
 import { TagInput } from './TagInput';
 import { updateBookmark } from '../lib/db';
@@ -7,9 +8,11 @@ import type { Bookmark, Category } from '../lib/types';
 export function BookmarkEditor({
   bookmark,
   onChange,
+  vaultSave = true,
 }: {
   bookmark: Bookmark;
   onChange?: (next: Bookmark) => void;
+  vaultSave?: boolean;
 }) {
   const timer = useRef<number | undefined>(undefined);
 
@@ -48,6 +51,7 @@ export function BookmarkEditor({
         <CategoryChips
           value={bookmark.category}
           includeUncategorized
+          allowCreate
           onChange={(category) => persist({ category: category as Category })}
         />
       </div>
@@ -57,6 +61,7 @@ export function BookmarkEditor({
           <TagInput tags={bookmark.tags} onChange={(tags) => persist({ tags })} />
         </div>
       </div>
+      {vaultSave && <BookmarkVaultSave url={bookmark.url} title={bookmark.title} />}
     </div>
   );
 }

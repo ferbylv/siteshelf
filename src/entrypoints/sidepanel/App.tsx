@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Brand } from '../../components/Brand';
 import { BookmarkAddForm } from '../../components/BookmarkAddForm';
+import { BookmarkImex } from '../../components/BookmarkImex';
 import { BookmarkEditor } from '../../components/BookmarkEditor';
 import { CategoryBadge, CategoryChips } from '../../components/CategoryChips';
 import { EmptyState } from '../../components/EmptyState';
@@ -77,9 +78,12 @@ export default function App() {
           <>
             <div className="toolbar-row">
               <span className="muted">{items.length} 条保藏</span>
-              <button type="button" className="ghost-btn" onClick={startAdd}>
-                手动添加
-              </button>
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                <button type="button" className="ghost-btn" onClick={startAdd}>
+                  手动添加
+                </button>
+                <BookmarkImex onImported={() => void reload()} />
+              </div>
             </div>
 
             {adding && (
@@ -101,7 +105,7 @@ export default function App() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <CategoryChips includeAll value={category} onChange={setCategory} />
+            <CategoryChips includeAll allowCreate value={category} onChange={setCategory} />
 
             {items.length === 0 && !adding && (
               <EmptyState

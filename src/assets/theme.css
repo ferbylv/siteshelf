@@ -503,3 +503,65 @@ a:hover {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+.pw-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pw-meter-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pw-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.15s ease, background 0.15s ease;
+}
+.pw-meter-label {
+  font-size: 11px;
+  min-width: 2.5em;
+  font-weight: 600;
+}
+
+.vault-save {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.vault-save h3 {
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.chip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+.chip-x {
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  padding: 0 4px 0 0;
+  line-height: 1;
+  font-size: 14px;
+}
+.chip-add {
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--ink-muted);
+}
+.chip-add-input {
+  width: 92px;
+  border: 1px dashed var(--line);
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  outline: none;
+}

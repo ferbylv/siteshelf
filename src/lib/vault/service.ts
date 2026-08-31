@@ -1,3 +1,4 @@
+import { masterPasswordMeetsPolicy, scorePassword } from '../password-strength';
 import {
   createVaultMeta,
   decryptLogin,
@@ -34,6 +35,7 @@ import {
   type LoginSummary,
   type PendingSave,
   type StoredVaultRecord,
+  type VaultMeta,
 } from './types';
 
 export class VaultError extends Error {
@@ -58,6 +60,13 @@ const WRONG = '主密码不正确，请重试。';
 function assertStrong(password: string): void {
   if (password.length < MIN_MASTER_LENGTH) {
     throw new VaultError(`主密码至少 ${MIN_MASTER_LENGTH} 位。`, 'weak-password');
+  }
+  if (!masterPasswordMeetsPolicy(password, MIN_MASTER_LENGTH)) {
+    const { label } = scorePassword(password);
+    throw new VaultError(
+      `主密码强度不足（当前：${label}），请至少达到「一般」。`,
+      'weak-password',
+    );
   }
 }
 
@@ -308,4 +317,26 @@ export async function syncPendingBadge(activeTabIdHint?: number): Promise<void> 
   } catch {
     /* tests / no action API */
   }
+}
+
+export async function exportVaultCipher(): Promise<{
+  meta: VaultMeta;
+  records: StoredVaultRecord[];
+}> {
+  const meta = await getVaultMeta();
+  if (!meta) throw new VaultError('尚未设置主密码。', 'not-setup');
+  const records = await listStoredRecords();
+  return { meta, records };
+}
+
+/** Full replace of meta + ciphertext records, then lock. Unlock with the backup master password. */
+export async function restoreVaultBackup(
+  meta: VaultMeta,
+  records: StoredVaultRecord[],
+): Promise<void> {
+  if (!meta?.salt || !meta.wrappedDek || !meta.wrappedDekIv) {
+    throw new VaultError('备份不完整。', 'corrupt');
+  }
+  await replaceAllRecords(meta, records);
+  await lockVault();
 }

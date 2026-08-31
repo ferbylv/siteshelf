@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Brand } from '../../components/Brand';
 import { BookmarkEditor } from '../../components/BookmarkEditor';
+import { BookmarkVaultSave } from '../../components/BookmarkVaultSave';
 import { Favicon } from '../../components/Favicon';
 import { SettingsForm } from '../../components/SettingsForm';
 import { classifyPage } from '../../lib/ai';
@@ -170,7 +171,10 @@ export default function App() {
         </button>
 
         {bookmark && (phase === 'done' || (phase === 'idle' && existing)) && (
-          <BookmarkEditor bookmark={bookmark} onChange={setBookmark} />
+          <>
+            <BookmarkEditor bookmark={bookmark} onChange={setBookmark} vaultSave={false} />
+            <BookmarkVaultSave url={bookmark.url} title={bookmark.title} />
+          </>
         )}
       </>
       )}

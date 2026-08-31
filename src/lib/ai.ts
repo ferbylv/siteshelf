@@ -2,7 +2,8 @@
  * Classification only receives PageMetadata (public URL/title/description/excerpt).
  * Vault usernames and passwords must never be passed into classifyPage.
  */
-import { getLanguageModel } from './prompt-api';
+import { listClassifyCategories } from './categories';
+import { getLanguageModel, promptApiSessionOptions } from './prompt-api';
 import { loadAiSettings } from './settings';
 import {
   CATEGORIES,
@@ -12,24 +13,26 @@ import {
   type PageMetadata,
 } from './types';
 
-const CLASSIFY_SCHEMA = {
-  type: 'object',
-  properties: {
-    summary: { type: 'string' },
-    category: { type: 'string', enum: [...CATEGORIES] },
-    tags: { type: 'array', items: { type: 'string' } },
-  },
-  required: ['summary', 'category', 'tags'],
-  additionalProperties: false,
-};
+function classifySchema(categories: string[]) {
+  return {
+    type: 'object',
+    properties: {
+      summary: { type: 'string' },
+      category: { type: 'string', enum: categories },
+      tags: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['summary', 'category', 'tags'],
+    additionalProperties: false,
+  };
+}
 
-function buildPrompt(meta: PageMetadata): string {
+function buildPrompt(meta: PageMetadata, categories: string[]): string {
   return [
     '你是网页分类助手。只根据下列公开元数据，判断这个网页或站点是做什么的。',
     '不要臆造登录信息、密码或任何未提供的隐私内容。',
     '输出 JSON，字段：',
     '- summary: 一句简体中文，说明这个页面或站点的用途',
-    `- category: 必须是以下之一：${CATEGORIES.join('、')}`,
+    `- category: 必须是以下之一：${categories.join('、')}。优先选择最具体的分类，包括用户自建分类。`,
     '- tags: 2 到 4 个简短中文或英文标签',
     '',
     `URL: ${meta.url}`,
@@ -51,16 +54,14 @@ function parseJsonObject(text: string): Record<string, unknown> {
   return JSON.parse(trimmed.slice(start, end + 1)) as Record<string, unknown>;
 }
 
-function sanitize(raw: Record<string, unknown>): AiClassification {
+function sanitize(raw: Record<string, unknown>, allowed: string[]): AiClassification {
   const summary =
     typeof raw.summary === 'string' && raw.summary.trim()
       ? raw.summary.trim().replace(/\s+/g, ' ').slice(0, 120)
       : '（尚未生成摘要）';
 
   const categoryRaw = typeof raw.category === 'string' ? raw.category.trim() : '';
-  const category: Category = (CATEGORIES as readonly string[]).includes(categoryRaw)
-    ? (categoryRaw as Category)
-    : '其他';
+  const category: Category = allowed.includes(categoryRaw) ? categoryRaw : '其他';
 
   const tagsSrc = Array.isArray(raw.tags) ? raw.tags : [];
   const tags = tagsSrc
@@ -79,16 +80,30 @@ export const FAILED_CLASSIFICATION: AiClassification = {
   tags: [],
 };
 
-async function classifyWithPromptApi(meta: PageMetadata): Promise<AiClassification> {
+async function loadAllowedCategories(): Promise<string[]> {
+  try {
+    const names = await listClassifyCategories();
+    return names.length ? names : [...CATEGORIES];
+  } catch {
+    return [...CATEGORIES];
+  }
+}
+
+async function classifyWithPromptApi(
+  meta: PageMetadata,
+  categories: string[],
+): Promise<AiClassification> {
   const LM = getLanguageModel();
   if (!LM) throw new Error('当前浏览器没有 Prompt API');
 
-  const availability = await LM.availability();
+  const sessionOptions = promptApiSessionOptions();
+  const availability = await LM.availability(sessionOptions);
   if (availability === 'unavailable') {
     throw new Error('本地语言模型不可用');
   }
 
   const session = await LM.create({
+    ...sessionOptions,
     initialPrompts: [
       {
         role: 'system',
@@ -98,10 +113,10 @@ async function classifyWithPromptApi(meta: PageMetadata): Promise<AiClassificati
   });
 
   try {
-    const text = await session.prompt(buildPrompt(meta), {
-      responseConstraint: CLASSIFY_SCHEMA,
+    const text = await session.prompt(buildPrompt(meta, categories), {
+      responseConstraint: classifySchema(categories),
     });
-    return sanitize(parseJsonObject(text));
+    return sanitize(parseJsonObject(text), categories);
   } finally {
     session.destroy();
   }
@@ -113,7 +128,10 @@ function completionsUrl(baseUrl: string): string {
   return `${trimmed}/chat/completions`;
 }
 
-async function classifyWithOpenAI(meta: PageMetadata): Promise<AiClassification> {
+async function classifyWithOpenAI(
+  meta: PageMetadata,
+  categories: string[],
+): Promise<AiClassification> {
   const settings = await loadAiSettings();
   if (!settings.apiKey.trim()) {
     throw new Error('尚未配置兼容 API 密钥');
@@ -137,7 +155,7 @@ async function classifyWithOpenAI(meta: PageMetadata): Promise<AiClassification>
           role: 'system',
           content: '你只输出 JSON，不要 Markdown 或解释。',
         },
-        { role: 'user', content: buildPrompt(meta) },
+        { role: 'user', content: buildPrompt(meta, categories) },
       ],
     }),
   });
@@ -151,7 +169,7 @@ async function classifyWithOpenAI(meta: PageMetadata): Promise<AiClassification>
   };
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('兼容 API 返回为空');
-  return sanitize(parseJsonObject(content));
+  return sanitize(parseJsonObject(content), categories);
 }
 
 export async function classifyPage(
@@ -159,6 +177,7 @@ export async function classifyPage(
 ): Promise<{ result: AiClassification; source: 'prompt-api' | 'openai' | 'none'; error?: string }> {
   const settings = await loadAiSettings();
   const errors: string[] = [];
+  const categories = await loadAllowedCategories();
 
   const tryPrompt =
     settings.provider === 'auto' || settings.provider === 'prompt-api';
@@ -167,7 +186,7 @@ export async function classifyPage(
 
   if (tryPrompt) {
     try {
-      const result = await classifyWithPromptApi(meta);
+      const result = await classifyWithPromptApi(meta, categories);
       return { result, source: 'prompt-api' };
     } catch (err) {
       errors.push(err instanceof Error ? err.message : 'Prompt API 失败');
@@ -183,7 +202,7 @@ export async function classifyPage(
 
   if (tryOpenAI) {
     try {
-      const result = await classifyWithOpenAI(meta);
+      const result = await classifyWithOpenAI(meta, categories);
       return { result, source: 'openai' };
     } catch (err) {
       errors.push(err instanceof Error ? err.message : '兼容 API 失败');

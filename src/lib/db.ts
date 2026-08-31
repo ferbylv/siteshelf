@@ -36,6 +36,14 @@ function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
+function waitTx(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error('数据库事务失败'));
+    tx.onabort = () => reject(tx.error ?? new Error('数据库事务中止'));
+  });
+}
+
 export function notifyBookmarksChanged(): void {
   void browser.runtime.sendMessage({ type: BOOKMARKS_CHANGED_MESSAGE }).catch(() => {
     /* no listener yet */
@@ -116,3 +124,22 @@ export async function deleteBookmark(id: string): Promise<void> {
   await reqToPromise(tx.objectStore(BOOKMARKS_STORE).delete(id));
   notifyBookmarksChanged();
 }
+
+export async function remapCategory(from: string, to: string): Promise<void> {
+  if (!from || from === to) return;
+  const db = await openDb();
+  const tx = db.transaction(BOOKMARKS_STORE, 'readwrite');
+  const store = tx.objectStore(BOOKMARKS_STORE);
+  const rows = (await reqToPromise(store.getAll())) as Bookmark[];
+  const now = Date.now();
+  let changed = false;
+  for (const row of rows) {
+    if (row.category === from) {
+      store.put({ ...row, category: to, updatedAt: now });
+      changed = true;
+    }
+  }
+  await waitTx(tx);
+  if (changed) notifyBookmarksChanged();
+}
+

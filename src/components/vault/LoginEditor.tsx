@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PasswordStrength } from '../PasswordStrength';
 import { generatePassword } from '../../lib/vault/generate';
 import { saveLogin, VaultError } from '../../lib/vault/service';
 import type { LoginRecord } from '../../lib/vault/types';
@@ -75,6 +76,7 @@ export function LoginEditor({
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="new-password"
         />
+        <PasswordStrength password={password} />
         <div className="row">
           <button type="button" className="icon-btn" onClick={() => setReveal((v) => !v)}>
             {reveal ? '隐藏密码' : '显示密码'}

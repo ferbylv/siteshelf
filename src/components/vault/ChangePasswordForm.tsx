@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { PasswordStrength } from '../PasswordStrength';
+import { masterPasswordMeetsPolicy } from '../../lib/password-strength';
 import { MIN_MASTER_LENGTH } from '../../lib/vault/types';
 import { changeMasterPassword, VaultError } from '../../lib/vault/service';
 
@@ -28,6 +30,8 @@ export function ChangePasswordForm({ onDone }: { onDone?: () => void }) {
     }
   };
 
+  const strongEnough = masterPasswordMeetsPolicy(nextPassword, MIN_MASTER_LENGTH);
+
   return (
     <div className="stack" style={{ padding: 0 }}>
       <p className="muted">
@@ -43,13 +47,14 @@ export function ChangePasswordForm({ onDone }: { onDone?: () => void }) {
         />
       </div>
       <div className="field">
-        <label>新主密码（至少 {MIN_MASTER_LENGTH} 位）</label>
+        <label>新主密码（至少 {MIN_MASTER_LENGTH} 位，强度一般以上）</label>
         <input
           type="password"
           autoComplete="off"
           value={nextPassword}
           onChange={(e) => setNextPassword(e.target.value)}
         />
+        <PasswordStrength password={nextPassword} />
       </div>
       <div className="field">
         <label>确认新主密码</label>
@@ -65,7 +70,7 @@ export function ChangePasswordForm({ onDone }: { onDone?: () => void }) {
       <button
         type="button"
         className="primary-btn"
-        disabled={busy || nextPassword.length < MIN_MASTER_LENGTH}
+        disabled={busy || !strongEnough}
         onClick={() => void submit()}
       >
         {busy ? '正在重新加密…' : '更改主密码'}

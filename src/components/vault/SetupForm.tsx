@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { PasswordStrength } from '../PasswordStrength';
+import { RestoreBackup } from './RestoreBackup';
+import { masterPasswordMeetsPolicy } from '../../lib/password-strength';
 import { MIN_MASTER_LENGTH } from '../../lib/vault/types';
 import { setupVault, VaultError } from '../../lib/vault/service';
 
@@ -21,6 +24,8 @@ export function SetupForm({ onReady }: { onReady: () => void }) {
     }
   };
 
+  const strongEnough = masterPasswordMeetsPolicy(password, MIN_MASTER_LENGTH);
+
   return (
     <div className="stack" style={{ padding: 0 }}>
       <div className="card vault-hero">
@@ -30,7 +35,7 @@ export function SetupForm({ onReady }: { onReady: () => void }) {
         </p>
       </div>
       <div className="field">
-        <label htmlFor="siteshelf-setup-pass">主密码（至少 {MIN_MASTER_LENGTH} 位）</label>
+        <label htmlFor="siteshelf-setup-pass">主密码（至少 {MIN_MASTER_LENGTH} 位，强度一般以上）</label>
         <input
           id="siteshelf-setup-pass"
           type="password"
@@ -38,6 +43,7 @@ export function SetupForm({ onReady }: { onReady: () => void }) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+        <PasswordStrength password={password} />
       </div>
       <div className="field">
         <label htmlFor="siteshelf-setup-confirm">再输入一次</label>
@@ -56,7 +62,7 @@ export function SetupForm({ onReady }: { onReady: () => void }) {
       <button
         type="button"
         className="primary-btn"
-        disabled={busy || password.length < MIN_MASTER_LENGTH}
+        disabled={busy || !strongEnough}
         onClick={() => void submit()}
       >
         {busy ? '正在创建保险库…' : '创建保险库'}
@@ -64,6 +70,7 @@ export function SetupForm({ onReady }: { onReady: () => void }) {
       <p className="muted">
         登录密码只在你确认「保存到页架」后写入加密记录，不会发给 AI，也不会自动上传。
       </p>
+      <RestoreBackup onRestored={onReady} />
     </div>
   );
 }
