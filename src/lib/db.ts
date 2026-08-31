@@ -4,9 +4,9 @@ import {
 } from './types';
 
 /**
- * Bookmarks live in their own IndexedDB store.
- * A later vault feature must add a separate object store / database
- * and must never mix credentials into `bookmarks`.
+ * Bookmarks live in their own IndexedDB database/store.
+ * Vault credentials use a separate database (`siteshelf-vault`) and must
+ * never be mixed into `bookmarks` or read as plaintext from here.
  */
 const DB_NAME = 'siteshelf';
 const DB_VERSION = 1;

@@ -1,3 +1,7 @@
+/**
+ * Classification only receives PageMetadata (public URL/title/description/excerpt).
+ * Vault usernames and passwords must never be passed into classifyPage.
+ */
 import { getLanguageModel } from './prompt-api';
 import { loadAiSettings } from './settings';
 import {

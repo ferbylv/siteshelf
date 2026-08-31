@@ -431,3 +431,37 @@ a:hover {
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
+
+.tabbar {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: var(--bg-soft);
+  border-radius: 12px;
+}
+.tab {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  padding: 7px 10px;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+.tab-active {
+  background: var(--bg-elev);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.vault-hero {
+  padding: 14px;
+}
+.vault-hero h2 {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  word-break: break-all;
+}

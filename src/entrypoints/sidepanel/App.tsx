@@ -6,6 +6,8 @@ import { EmptyState } from '../../components/EmptyState';
 import { Favicon } from '../../components/Favicon';
 import { deleteBookmark, listBookmarks } from '../../lib/db';
 import { BOOKMARKS_CHANGED_MESSAGE, type Bookmark } from '../../lib/types';
+import { TabBar } from '../../components/TabBar';
+import { VaultLibrary } from '../../components/vault/VaultLibrary';
 
 export default function App() {
   const [items, setItems] = useState<Bookmark[]>([]);
@@ -13,6 +15,7 @@ export default function App() {
   const [category, setCategory] = useState('全部');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [tab, setTab] = useState<'shelf' | 'vault'>('shelf');
 
   const reload = useCallback(async () => {
     setItems(await listBookmarks());
@@ -53,8 +56,23 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="topbar">
-        <Brand subtitle={`${items.length} 条保藏`} />
+        <Brand subtitle={tab === 'vault' ? '本机保险库' : `${items.length} 条保藏`} />
       </div>
+      <div className="stack" style={{ paddingBottom: 0 }}>
+        <TabBar
+          tabs={[
+            { id: 'shelf', label: '页架' },
+            { id: 'vault', label: '保险库' },
+          ]}
+          value={tab}
+          onChange={(id) => setTab(id as 'shelf' | 'vault')}
+        />
+      </div>
+      {tab === 'vault' ? (
+        <div className="stack">
+          <VaultLibrary />
+        </div>
+      ) : (
       <div className="stack">
         <input
           className="search-input"
@@ -140,6 +158,7 @@ export default function App() {
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,8 @@ export default defineConfig({
     name: 'SiteShelf 页架',
     short_name: '页架',
     description:
-      '保藏网页并生成中文摘要与分类。仅保存公开元数据，不含密码管理。',
+      '保藏网页并生成本地分类；另含本机加密保险库与精确主机自动填充。',
     permissions: ['storage', 'activeTab', 'scripting', 'tabs'],
+    host_permissions: ['https://*/*', 'http://*/*'],
   },
 });

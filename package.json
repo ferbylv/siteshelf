@@ -1,9 +1,9 @@
 {
   "name": "siteshelf",
   "displayName": "SiteShelf 页架",
-  "description": "保藏网页，并用本地或兼容 API 生成中文摘要与分类。仅保存公开元数据，不含密码管理。",
+  "description": "保藏网页并生成本地分类；另含本机加密保险库与精确主机自动填充。",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -12,6 +12,7 @@
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "compile": "tsc --noEmit",
+    "verify:vault": "bun scripts/verify-vault.ts",
     "postinstall": "wxt prepare"
   },
   "dependencies": {

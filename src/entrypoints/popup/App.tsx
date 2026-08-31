@@ -9,6 +9,8 @@ import { getByNormalizedUrl, upsertBookmark } from '../../lib/db';
 import { isRestrictedUrl, normalizeUrl } from '../../lib/url';
 import { openLibraryPanel } from '../../lib/sidepanel';
 import type { Bookmark } from '../../lib/types';
+import { TabBar } from '../../components/TabBar';
+import { PopupVault } from '../../components/vault/PopupVault';
 
 type Phase =
   | 'loading'
@@ -28,6 +30,7 @@ export default function App() {
   const [message, setMessage] = useState('');
   const [aiFailed, setAiFailed] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [tab, setTab] = useState<'shelf' | 'vault'>('shelf');
 
   useEffect(() => {
     void (async () => {
@@ -115,12 +118,28 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="topbar">
-        <Brand subtitle="保藏当前页" />
+        <Brand subtitle={tab === 'vault' ? '本机保险库' : '保藏当前页'} />
         <button type="button" className="ghost-btn" onClick={() => void openLibrary()}>
           打开页架
         </button>
       </div>
+      <div className="stack" style={{ paddingBottom: 0 }}>
+        <TabBar
+          tabs={[
+            { id: 'shelf', label: '保藏' },
+            { id: 'vault', label: '保险库' },
+          ]}
+          value={tab}
+          onChange={(id) => setTab(id as 'shelf' | 'vault')}
+        />
+      </div>
 
+      {tab === 'vault' ? (
+        <div className="stack">
+          <PopupVault />
+        </div>
+      ) : (
+      <>
       <div className="stack">
         <div className="card preview">
           <Favicon src={previewFavicon} title={previewTitle} url={previewUrl} />
@@ -176,6 +195,8 @@ export default function App() {
         <div className="stack">
           <SettingsForm compact />
         </div>
+      )}
+      </>
       )}
     </div>
   );
