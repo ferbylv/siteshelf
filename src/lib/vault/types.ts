@@ -14,6 +14,7 @@ export const KEY_BITS = 256;
 
 export const VAULT_CHANGED_MESSAGE = 'siteshelf:vault-changed' as const;
 export const VAULT_SESSION_MESSAGE = 'siteshelf:vault-session' as const;
+export const VAULT_PENDING_MESSAGE = 'siteshelf:vault-pending' as const;
 
 export type VaultIdleMinutes = 0 | 5 | 15 | 30;
 
@@ -83,6 +84,8 @@ export interface PendingSave {
   username: string;
   password: string;
   capturedAt: number;
+  /** Tab that captured the login. Pending is never shown or saved on another tab. */
+  tabId: number;
 }
 
 export const VAULT_MSG = {

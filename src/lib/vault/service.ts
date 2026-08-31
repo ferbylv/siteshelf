@@ -15,12 +15,14 @@ import {
   replaceAllRecords,
 } from './db';
 import { parsePageTarget, recordMatchesPage, summarize, toLoginTarget } from './match';
+import { isFreshPending, pendingForTab } from './pending';
 import {
   clearPendingSave,
-  getPendingSave,
+  getPendingSaveForTab,
   isUnlocked,
   loadSessionDek,
   lockVault,
+  notifyPendingChanged,
   persistDek,
   setPendingSave,
   touchActivity,
@@ -242,24 +244,29 @@ export async function fillPayloadFor(
 
 export async function stagePending(pending: PendingSave): Promise<void> {
   await setPendingSave(pending);
+  await syncPendingBadge(pending.tabId);
+  notifyPendingChanged(pending.tabId);
 }
 
-export async function readPending(): Promise<PendingSave | undefined> {
-  const pending = await getPendingSave<PendingSave>();
+export async function readPending(tabId: number): Promise<PendingSave | undefined> {
+  const pending = await getPendingSaveForTab(tabId);
   if (!pending) return undefined;
-  if (Date.now() - pending.capturedAt > 10 * 60_000) {
-    await clearPendingSave();
+  const scoped = pendingForTab({ [String(tabId)]: pending }, tabId);
+  if (!scoped || !isFreshPending(scoped)) {
+    await clearPendingSave(tabId);
     return undefined;
   }
-  return pending;
+  return scoped;
 }
 
-export async function dismissPending(): Promise<void> {
-  await clearPendingSave();
+export async function dismissPending(tabId: number): Promise<void> {
+  await clearPendingSave(tabId);
+  await syncPendingBadge();
+  notifyPendingChanged(tabId);
 }
 
-export async function confirmPendingSave(): Promise<LoginRecord | undefined> {
-  const pending = await readPending();
+export async function confirmPendingSave(tabId: number): Promise<LoginRecord | undefined> {
+  const pending = await readPending(tabId);
   if (!pending) return undefined;
   const saved = await saveLogin({
     title: pending.host,
@@ -271,6 +278,34 @@ export async function confirmPendingSave(): Promise<LoginRecord | undefined> {
     password: pending.password,
     notes: '',
   });
-  await clearPendingSave();
+  await dismissPending(tabId);
   return saved;
+}
+
+async function activeTabId(): Promise<number | undefined> {
+  try {
+    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    return tab?.id;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Badge "1" when the current tab has a pending save. */
+export async function syncPendingBadge(activeTabIdHint?: number): Promise<void> {
+  try {
+    const live = await activeTabId();
+    const tabId = live ?? (typeof activeTabIdHint === 'number' ? activeTabIdHint : undefined);
+    const pending = typeof tabId === 'number' ? await readPending(tabId) : undefined;
+    await browser.action.setBadgeText({ text: pending ? '1' : '' });
+    if (pending) {
+      await browser.action.setBadgeBackgroundColor({ color: '#c45c26' });
+      const action = browser.action as {
+        setBadgeTextColor?: (details: { color: string }) => Promise<void>;
+      };
+      await action.setBadgeTextColor?.({ color: '#ffffff' });
+    }
+  } catch {
+    /* tests / no action API */
+  }
 }

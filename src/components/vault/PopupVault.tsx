@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
+import { PendingSaveBanner } from './PendingSaveBanner';
 import { SetupForm } from './SetupForm';
 import { UnlockForm } from './UnlockForm';
 import { getActiveTab } from '../../lib/capture';
 import { maskPassword } from '../../lib/vault/encoding';
 import { parsePageTarget } from '../../lib/vault/match';
 import {
-  confirmPendingSave,
-  dismissPending,
   lockVaultNow,
   matchesForUrl,
   readPending,
+  syncPendingBadge,
   vaultStatus,
 } from '../../lib/vault/service';
-import { VAULT_MSG, type LoginRecord, type PendingSave } from '../../lib/vault/types';
+import {
+  VAULT_MSG,
+  VAULT_PENDING_MESSAGE,
+  type LoginRecord,
+  type PendingSave,
+} from '../../lib/vault/types';
 import { openLibraryPanel } from '../../lib/sidepanel';
 
 type Gate = 'loading' | 'setup' | 'locked' | 'open';
@@ -30,6 +35,9 @@ export function PopupVault() {
     const tab = await getActiveTab().catch(() => undefined);
     const url = tab?.url || '';
     setTabUrl(url);
+    // Pending is tab-scoped: only this tab's staged login can be confirmed here.
+    setPending(typeof tab?.id === 'number' ? await readPending(tab.id) : undefined);
+    void syncPendingBadge(tab?.id);
     if (!status.setup) {
       setGate('setup');
       return;
@@ -40,13 +48,17 @@ export function PopupVault() {
       return;
     }
     setGate('open');
-    setPending(await readPending());
     if (url) setMatches(await matchesForUrl(url));
     else setMatches([]);
   }, []);
 
   useEffect(() => {
     void reload();
+    const onMessage = (msg: { type?: string }) => {
+      if (msg?.type === VAULT_PENDING_MESSAGE) void reload();
+    };
+    browser.runtime.onMessage.addListener(onMessage);
+    return () => browser.runtime.onMessage.removeListener(onMessage);
   }, [reload]);
 
   const fill = async (record: LoginRecord) => {
@@ -73,6 +85,18 @@ export function PopupVault() {
     }
   };
 
+  const pendingBanner =
+    pending && gate !== 'loading' ? (
+      <PendingSaveBanner
+        pending={pending}
+        gate={gate}
+        onChanged={() => {
+          setMessage('');
+          void reload();
+        }}
+      />
+    ) : null;
+
   if (gate === 'loading') {
     return (
       <div className="banner banner-warn row">
@@ -81,53 +105,35 @@ export function PopupVault() {
       </div>
     );
   }
-  if (gate === 'setup') return <SetupForm onReady={() => void reload()} />;
-  if (gate === 'locked') return <UnlockForm onReady={() => void reload()} />;
+  if (gate === 'setup') {
+    return (
+      <div className="stack" style={{ padding: 0 }}>
+        {pendingBanner}
+        <SetupForm onReady={() => void reload()} />
+      </div>
+    );
+  }
+  if (gate === 'locked') {
+    return (
+      <div className="stack" style={{ padding: 0 }}>
+        {pendingBanner}
+        <UnlockForm onReady={() => void reload()} />
+      </div>
+    );
+  }
 
   const page = parsePageTarget(tabUrl);
 
   return (
     <div className="stack" style={{ padding: 0 }}>
+      {pendingBanner}
+
       <div className="card preview">
         <div className="preview-body">
           <h2>当前站点</h2>
           <div className="preview-url">{page ? page.origin : '无法在此页填充'}</div>
         </div>
       </div>
-
-      {pending && (
-        <div className="card item">
-          <h2>确认保存刚才的登录？</h2>
-          <p className="muted">
-            {pending.origin} · {pending.username} · {maskPassword(pending.password)}
-          </p>
-          <div className="item-actions">
-            <button
-              type="button"
-              className="primary-btn"
-              onClick={() =>
-                void confirmPendingSave().then(() => {
-                  setMessage('已保存。');
-                  void reload();
-                })
-              }
-            >
-              保存到页架
-            </button>
-            <button
-              type="button"
-              className="ghost-btn"
-              onClick={() =>
-                void dismissPending().then(() => {
-                  setPending(undefined);
-                })
-              }
-            >
-              不保存
-            </button>
-          </div>
-        </div>
-      )}
 
       {page && matches.length === 0 && (
         <EmptyLine text="此主机还没有保存的登录。提交登录表单后会询问是否保存。" />

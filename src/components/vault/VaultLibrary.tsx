@@ -3,20 +3,21 @@ import { EmptyState } from '../EmptyState';
 import { Favicon } from '../Favicon';
 import { ChangePasswordForm } from './ChangePasswordForm';
 import { LoginEditor } from './LoginEditor';
+import { PendingSaveBanner } from './PendingSaveBanner';
 import { SetupForm } from './SetupForm';
 import { UnlockForm } from './UnlockForm';
+import { getActiveTab } from '../../lib/capture';
 import { maskPassword } from '../../lib/vault/encoding';
 import {
   deleteLogin,
   listLogins,
   lockVaultNow,
   readPending,
-  confirmPendingSave,
-  dismissPending,
   vaultStatus,
 } from '../../lib/vault/service';
 import {
   VAULT_CHANGED_MESSAGE,
+  VAULT_PENDING_MESSAGE,
   VAULT_SESSION_MESSAGE,
   type LoginRecord,
   type PendingSave,
@@ -40,6 +41,12 @@ export function VaultLibrary() {
 
   const reloadGate = useCallback(async () => {
     const status = await vaultStatus();
+    try {
+      const tab = await getActiveTab();
+      setPending(typeof tab.id === 'number' ? await readPending(tab.id) : undefined);
+    } catch {
+      setPending(undefined);
+    }
     if (!status.setup) {
       setGate('setup');
       setItems([]);
@@ -53,14 +60,17 @@ export function VaultLibrary() {
     }
     setGate('open');
     setItems(await listLogins());
-    setPending(await readPending());
     setIdleMinutes((await loadVaultSettings()).idleMinutes);
   }, []);
 
   useEffect(() => {
     void reloadGate();
     const onMessage = (msg: { type?: string }) => {
-      if (msg?.type === VAULT_CHANGED_MESSAGE || msg?.type === VAULT_SESSION_MESSAGE) {
+      if (
+        msg?.type === VAULT_CHANGED_MESSAGE ||
+        msg?.type === VAULT_SESSION_MESSAGE ||
+        msg?.type === VAULT_PENDING_MESSAGE
+      ) {
         void reloadGate();
       }
     };
@@ -94,8 +104,26 @@ export function VaultLibrary() {
       </div>
     );
   }
-  if (gate === 'setup') return <SetupForm onReady={() => void reloadGate()} />;
-  if (gate === 'locked') return <UnlockForm onReady={() => void reloadGate()} />;
+  const pendingBanner = pending ? (
+    <PendingSaveBanner pending={pending} gate={gate} onChanged={() => void reloadGate()} />
+  ) : null;
+
+  if (gate === 'setup') {
+    return (
+      <div className="stack" style={{ padding: 0 }}>
+        {pendingBanner}
+        <SetupForm onReady={() => void reloadGate()} />
+      </div>
+    );
+  }
+  if (gate === 'locked') {
+    return (
+      <div className="stack" style={{ padding: 0 }}>
+        {pendingBanner}
+        <UnlockForm onReady={() => void reloadGate()} />
+      </div>
+    );
+  }
 
   return (
     <div className="stack" style={{ padding: 0 }}>
@@ -118,40 +146,8 @@ export function VaultLibrary() {
         </div>
       </div>
 
-      {pending && (
-        <div className="card item">
-          <h2>待确认保存</h2>
-          <p className="muted">
-            {pending.origin}
-            <br />
-            用户名 {pending.username} · 密码 {maskPassword(pending.password)}
-          </p>
-          <div className="item-actions">
-            <button
-              type="button"
-              className="primary-btn"
-              onClick={() =>
-                void confirmPendingSave().then(() => {
-                  void reloadGate();
-                })
-              }
-            >
-              确认保存
-            </button>
-            <button
-              type="button"
-              className="ghost-btn"
-              onClick={() =>
-                void dismissPending().then(() => {
-                  setPending(undefined);
-                })
-              }
-            >
-              丢弃
-            </button>
-          </div>
-        </div>
-      )}
+      {pendingBanner}
+
 
       <input
         className="search-input"

@@ -1,4 +1,5 @@
-import { parsePageTarget, summarize } from './match';
+import { summarize } from './match';
+import { mergePendingForSave, stagePendingFromSender } from './pending';
 import {
   dismissPending,
   fillPayloadFor,
@@ -16,35 +17,20 @@ function senderPageUrl(sender: Sender): string | undefined {
   return sender.url || sender.tab?.url;
 }
 
-function isPendingSave(value: unknown): value is PendingSave {
-  if (!value || typeof value !== 'object') return false;
-  const v = value as PendingSave;
-  return (
-    typeof v.origin === 'string' &&
-    typeof v.host === 'string' &&
-    (v.scheme === 'http:' || v.scheme === 'https:') &&
-    typeof v.url === 'string' &&
-    typeof v.username === 'string' &&
-    typeof v.password === 'string' &&
-    typeof v.capturedAt === 'number'
-  );
+function senderTabId(sender: Sender): number | undefined {
+  const id = sender.tab?.id;
+  return typeof id === 'number' && Number.isInteger(id) && id >= 0 ? id : undefined;
 }
 
-function pendingFromSender(raw: unknown, sender: Sender): PendingSave | null {
-  if (!isPendingSave(raw)) return null;
-  const page = parsePageTarget(senderPageUrl(sender));
-  if (!page) return null;
-  if (raw.host !== page.host || raw.scheme !== page.scheme) return null;
-  if (raw.origin !== page.origin) return null;
-  return {
-    origin: page.origin,
-    host: page.host,
-    scheme: page.scheme,
-    url: page.url,
-    username: raw.username,
-    password: raw.password,
-    capturedAt: Date.now(),
-  };
+async function resolveTabId(sender: Sender): Promise<number | undefined> {
+  const fromSender = senderTabId(sender);
+  if (fromSender != null) return fromSender;
+  try {
+    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    return tab?.id;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function handleVaultMessage(
@@ -84,15 +70,20 @@ export async function handleVaultMessage(
   }
 
   if (type === VAULT_MSG.STAGE) {
-    const pending = pendingFromSender(msg.pending, sender);
-    if (!pending || !pending.username || !pending.password) return { ok: false };
+    const tabId = senderTabId(sender);
+    if (tabId == null) return { ok: false };
+    const pending = stagePendingFromSender(msg.pending, tabId, senderPageUrl(sender));
+    if (!pending) return { ok: false };
     await stagePending(pending);
     return { ok: true };
   }
 
   if (type === VAULT_MSG.SAVE) {
-    const pending = pendingFromSender(msg.pending, sender);
-    if (!pending) return { ok: false, error: '无法确认当前页面来源。' };
+    const tabId = await resolveTabId(sender);
+    if (tabId == null) return { ok: false, error: '无法确认当前标签页。' };
+    const staged = await readPending(tabId);
+    const pending = mergePendingForSave(staged, msg.pending, tabId, senderPageUrl(sender));
+    if (!pending) return { ok: false, error: '没有可保存的登录。' };
     try {
       await saveLogin({
         title: pending.host,
@@ -104,7 +95,7 @@ export async function handleVaultMessage(
         password: pending.password,
         notes: '',
       });
-      await dismissPending();
+      await dismissPending(tabId);
       return { ok: true };
     } catch (err) {
       const locked = err instanceof Error && err.message.includes('锁定');
@@ -117,11 +108,15 @@ export async function handleVaultMessage(
   }
 
   if (type === VAULT_MSG.GET_PENDING) {
-    return { pending: await readPending() };
+    const tabId = await resolveTabId(sender);
+    if (tabId == null) return { pending: undefined };
+    return { pending: await readPending(tabId) };
   }
 
   if (type === VAULT_MSG.DISMISS_PENDING) {
-    await dismissPending();
+    const tabId = await resolveTabId(sender);
+    if (tabId == null) return { ok: false };
+    await dismissPending(tabId);
     return { ok: true };
   }
 
@@ -133,3 +128,4 @@ export async function handleVaultMessage(
 }
 
 export { senderPageUrl };
+export type { PendingSave };

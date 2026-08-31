@@ -1,11 +1,11 @@
 import { importDekRaw, exportDekRaw } from './crypto';
 import { zeroBytes } from './encoding';
+import { asPendingMap, PENDING_SESSION_KEY, type PendingMap } from './pending';
 import { loadVaultSettings } from './settings';
-import { VAULT_SESSION_MESSAGE } from './types';
+import { VAULT_PENDING_MESSAGE, VAULT_SESSION_MESSAGE, type PendingSave } from './types';
 
 const DEK_KEY = 'siteshelf.vault.dek';
 const ACTIVITY_KEY = 'siteshelf.vault.activity';
-const PENDING_KEY = 'siteshelf.vault.pending';
 
 function sessionArea(): typeof browser.storage.local {
   const area = (browser.storage as { session?: typeof browser.storage.local }).session;
@@ -96,15 +96,44 @@ export async function isUnlocked(): Promise<boolean> {
   return Boolean(await loadSessionDek());
 }
 
-export async function setPendingSave(pending: unknown): Promise<void> {
-  await sessionArea().set({ [PENDING_KEY]: pending });
+export function notifyPendingChanged(tabId?: number): void {
+  const payload = { type: VAULT_PENDING_MESSAGE, tabId };
+  void browser.runtime.sendMessage(payload).catch(() => {
+    /* no extension-page listener */
+  });
+  if (typeof tabId === 'number') {
+    void browser.tabs.sendMessage(tabId, payload).catch(() => {
+      /* no content script */
+    });
+  }
 }
 
-export async function getPendingSave<T>(): Promise<T | undefined> {
-  const stored = await sessionArea().get(PENDING_KEY);
-  return stored[PENDING_KEY] as T | undefined;
+export async function readPendingMap(): Promise<PendingMap> {
+  const stored = await sessionArea().get(PENDING_SESSION_KEY);
+  return asPendingMap(stored[PENDING_SESSION_KEY]);
 }
 
-export async function clearPendingSave(): Promise<void> {
-  await sessionArea().remove(PENDING_KEY);
+export async function setPendingSave(pending: PendingSave): Promise<void> {
+  const area = sessionArea();
+  const stored = await area.get(PENDING_SESSION_KEY);
+  const map = asPendingMap(stored[PENDING_SESSION_KEY]);
+  map[String(pending.tabId)] = pending;
+  await area.set({ [PENDING_SESSION_KEY]: map });
+}
+
+export async function getPendingSaveForTab(tabId: number): Promise<PendingSave | undefined> {
+  const map = await readPendingMap();
+  return map[String(tabId)];
+}
+
+export async function clearPendingSave(tabId: number): Promise<void> {
+  const area = sessionArea();
+  const stored = await area.get(PENDING_SESSION_KEY);
+  const map = asPendingMap(stored[PENDING_SESSION_KEY]);
+  delete map[String(tabId)];
+  if (Object.keys(map).length === 0) {
+    await area.remove(PENDING_SESSION_KEY);
+  } else {
+    await area.set({ [PENDING_SESSION_KEY]: map });
+  }
 }

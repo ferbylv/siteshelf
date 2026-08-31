@@ -1,4 +1,5 @@
 import { handleVaultMessage } from '../lib/vault/runtime';
+import { dismissPending, syncPendingBadge } from '../lib/vault/service';
 
 export default defineBackground(() => {
   // Popup handles 保藏; side panel is the library.
@@ -15,4 +16,15 @@ export default defineBackground(() => {
     })();
     return true;
   });
+
+  browser.tabs.onRemoved.addListener((tabId) => {
+    void dismissPending(tabId);
+  });
+  browser.tabs.onActivated.addListener((info) => {
+    void syncPendingBadge(info.tabId);
+  });
+  browser.windows.onFocusChanged.addListener(() => {
+    void syncPendingBadge();
+  });
+  void syncPendingBadge();
 });
