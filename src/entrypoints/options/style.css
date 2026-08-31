@@ -1,0 +1,10 @@
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+.options-wrap {
+  max-width: 560px;
+  margin: 0 auto;
+}
