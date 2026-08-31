@@ -155,3 +155,23 @@ export function mergePendingForSave(
     tabId,
   };
 }
+
+/**
+ * Pure STAGE persist decision. If the site is already in the vault, drop any
+ * pending for this tab (so maybeShowPending cannot revive the save prompt).
+ * New sites keep the capture in the map. Runtime I/O (IndexedDB / session) is
+ * not used here so tests can cover the skip invariant without a browser.
+ */
+export function pendingMapAfterStage(
+  map: PendingMap,
+  pending: PendingSave,
+  alreadySaved: boolean,
+): { map: PendingMap; skipped: boolean } {
+  const next: PendingMap = { ...map };
+  if (alreadySaved) {
+    delete next[String(pending.tabId)];
+    return { map: next, skipped: true };
+  }
+  next[String(pending.tabId)] = pending;
+  return { map: next, skipped: false };
+}

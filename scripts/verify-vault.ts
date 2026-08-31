@@ -5,12 +5,13 @@ import {
   unlockDekFromMeta,
 } from '../src/lib/vault/crypto.ts';
 import { bytesToUtf8 } from '../src/lib/vault/encoding.ts';
-import { parsePageTarget, recordMatchesPage } from '../src/lib/vault/match.ts';
+import { parsePageTarget, recordMatchesPage, siteAlreadyInVault } from '../src/lib/vault/match.ts';
 import type { LoginRecord } from '../src/lib/vault/types.ts';
 import {
   asPendingMap,
   mergePendingForSave,
   pendingForTab,
+  pendingMapAfterStage,
   stagePendingFromSender,
 } from '../src/lib/vault/pending.ts';
 
@@ -79,6 +80,19 @@ assert(
 assert(
   recordMatchesPage({ host: 'evil.com', scheme: 'https:', origin: 'https://evil.com' }, evil),
   'exact evil.com should match itself',
+);
+
+assert(siteAlreadyInVault(gh, [record]), 'same host+scheme is already in the vault');
+assert(
+  siteAlreadyInVault(gh, [{ host: 'github.com', scheme: 'https:' }]),
+  'any login for that host+scheme suppresses, regardless of username',
+);
+assert(!siteAlreadyInVault(gist, [record]), 'github.com must not suppress gist.github.com');
+assert(!siteAlreadyInVault(httpGh, [record]), 'https must not suppress http');
+assert(!siteAlreadyInVault(gh, []), 'empty records must not suppress');
+assert(
+  !siteAlreadyInVault(gh, [{ host: 'github.com', scheme: 'http:' }]),
+  'http record must not suppress https pending',
 );
 
 console.log('verify-vault: ok');
@@ -155,3 +169,14 @@ assert(
 );
 
 console.log('verify-vault pending: ok');
+
+const already = [{ host: loginPending.host, scheme: loginPending.scheme }];
+const skippedStage = pendingMapAfterStage({ '11': loginPending }, loginPending, siteAlreadyInVault(loginPending, already));
+assert(skippedStage.skipped, 'existing site STAGE is skipped');
+assert(!skippedStage.map['11'], 'skipped STAGE does not belong in pending map');
+
+const newSiteStage = pendingMapAfterStage({}, loginPending, siteAlreadyInVault(loginPending, []));
+assert(!newSiteStage.skipped, 'new site STAGE is not skipped');
+assert(newSiteStage.map['11']?.host === 'login.example.com', 'new site STAGE still persists pending');
+
+console.log('verify-vault skip-existing: ok');

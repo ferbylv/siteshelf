@@ -415,15 +415,32 @@ function onSubmit(ev: Event, shadow: ShadowRoot): void {
   captureFromPassword(passwords[0]!, shadow);
 }
 
-function stageNow(pending: Omit<PendingSave, 'tabId'>): void {
+function stageNow(pending: Omit<PendingSave, 'tabId'>, shadow?: ShadowRoot): void {
   lastCapture = pending;
-  // Fire-and-forget: do not await UI or the round-trip. Navigation must not drop credentials.
-  void browser.runtime.sendMessage({ type: VAULT_MSG.STAGE, pending }).catch(() => {
-    /* background unavailable */
-  });
+  // Fire-and-forget send so navigation cannot drop NEW credentials. Only show
+  // the save prompt after STAGE replies ok and not skipped — existing sites
+  // must not persist pending, or maybeShowPending would revive the bar.
+  void browser.runtime
+    .sendMessage({ type: VAULT_MSG.STAGE, pending })
+    .then((res: unknown) => {
+      const result = res as { ok?: boolean; skipped?: boolean } | undefined;
+      if (result?.skipped) {
+        lastCapture = null;
+        if (shadow) wrapOf(shadow).querySelector('[data-dialog="save"]')?.remove();
+        return;
+      }
+      if (result?.ok && shadow) {
+        showSavePrompt(shadow, pending);
+      }
+    })
+    .catch(() => {
+      /* background unavailable */
+    });
 }
 
 function captureFromPassword(pass: HTMLInputElement, shadow: ShadowRoot): void {
+  // We just filled this page from the vault — the site is already saved.
+  if (didAutoFill) return;
   const form = pass.form;
   if (form && form.querySelectorAll('input[type="password"]').length !== 1) return;
   const user = findUsernameInput(pass);
@@ -441,8 +458,7 @@ function captureFromPassword(pass: HTMLInputElement, shadow: ShadowRoot): void {
     password,
     capturedAt: Date.now(),
   };
-  stageNow(pending);
-  showSavePrompt(shadow, pending);
+  stageNow(pending, shadow);
 }
 
 async function maybeShowPending(shadow: ShadowRoot): Promise<void> {

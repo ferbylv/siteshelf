@@ -15,7 +15,7 @@ import {
   putVaultMeta,
   replaceAllRecords,
 } from './db';
-import { parsePageTarget, recordMatchesPage, summarize, toLoginTarget } from './match';
+import { parsePageTarget, recordMatchesPage, siteAlreadyInVault, summarize, toLoginTarget, type PageTarget } from './match';
 import { isFreshPending, pendingForTab } from './pending';
 import {
   clearPendingSave,
@@ -56,6 +56,71 @@ export class VaultError extends Error {
 }
 
 const WRONG = '主密码不正确，请重试。';
+
+/** Host+scheme only. Never store usernames or passwords here. */
+const SAVED_HOSTS_KEY = 'siteshelf.vault.savedHosts';
+
+function savedHostKey(row: Pick<PageTarget, 'host' | 'scheme'>): string {
+  return `${row.scheme}//${row.host}`;
+}
+
+function hostsFromRecords(records: Array<Pick<LoginRecord, 'host' | 'scheme'>>): string[] {
+  return [...new Set(records.map(savedHostKey))].sort();
+}
+
+async function readSavedHostIndex(): Promise<string[]> {
+  try {
+    const stored = await browser.storage.local.get(SAVED_HOSTS_KEY);
+    const value = stored[SAVED_HOSTS_KEY];
+    if (!Array.isArray(value) || value.length === 0) return [];
+    return value.filter((item): item is string => typeof item === 'string');
+  } catch {
+    return [];
+  }
+}
+
+async function writeSavedHostIndex(
+  records: Array<Pick<LoginRecord, 'host' | 'scheme'>>,
+): Promise<void> {
+  try {
+    await browser.storage.local.set({ [SAVED_HOSTS_KEY]: hostsFromRecords(records) });
+  } catch {
+    /* tests / storage unavailable */
+  }
+}
+
+async function clearSavedHostIndex(): Promise<void> {
+  try {
+    await browser.storage.local.remove(SAVED_HOSTS_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * True when any vault login already exists for this host+scheme.
+ * Unlocked: decrypt and refresh the host index.
+ * Locked: consult the host index only (never decrypt). Empty/missing index
+ * does not suppress, so a first-time save while locked still prompts.
+ */
+export async function isSiteAlreadySaved(
+  pending: Pick<PageTarget, 'host' | 'scheme'>,
+): Promise<boolean> {
+  const dek = await loadSessionDek();
+  if (dek) {
+    try {
+      await touchActivity();
+      const all = await decryptAll(dek);
+      await writeSavedHostIndex(all);
+      return siteAlreadyInVault(pending, all);
+    } catch {
+      /* fall through to the host index rather than blocking STAGE */
+    }
+  }
+  const index = await readSavedHostIndex();
+  if (!index.length) return false;
+  return index.includes(savedHostKey(pending));
+}
 
 function assertStrong(password: string): void {
   if (password.length < MIN_MASTER_LENGTH) {
@@ -102,11 +167,17 @@ export async function setupVault(password: string, confirm: string): Promise<voi
 export async function unlockVault(password: string): Promise<void> {
   const meta = await getVaultMeta();
   if (!meta) throw new VaultError('尚未设置主密码。', 'not-setup');
+  let dek: CryptoKey;
   try {
-    const dek = await unlockDekFromMeta(password, meta);
+    dek = await unlockDekFromMeta(password, meta);
     await persistDek(dek);
   } catch {
     throw new VaultError(WRONG, 'wrong-password');
+  }
+  try {
+    await writeSavedHostIndex(await decryptAll(dek));
+  } catch {
+    /* index is best-effort */
   }
 }
 
@@ -218,12 +289,25 @@ export async function saveLogin(draft: LoginDraft): Promise<LoginRecord> {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   });
+  const next = existing
+    ? all.map((row) => (row.id === record.id ? record : row))
+    : [...all, record];
+  try {
+    await writeSavedHostIndex(next);
+  } catch {
+    /* index is best-effort */
+  }
   return record;
 }
 
 export async function deleteLogin(id: string): Promise<void> {
-  await requireDek();
+  const dek = await requireDek();
   await deleteStoredRecord(id);
+  try {
+    await writeSavedHostIndex(await decryptAll(dek));
+  } catch {
+    /* index is best-effort */
+  }
 }
 
 export async function matchesForUrl(pageUrl: string): Promise<LoginRecord[]> {
@@ -339,4 +423,5 @@ export async function restoreVaultBackup(
   }
   await replaceAllRecords(meta, records);
   await lockVault();
+  await clearSavedHostIndex();
 }

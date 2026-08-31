@@ -3,6 +3,7 @@ import { mergePendingForSave, stagePendingFromSender } from './pending';
 import {
   dismissPending,
   fillPayloadFor,
+  isSiteAlreadySaved,
   matchesForUrl,
   readPending,
   saveLogin,
@@ -74,6 +75,10 @@ export async function handleVaultMessage(
     if (tabId == null) return { ok: false };
     const pending = stagePendingFromSender(msg.pending, tabId, senderPageUrl(sender));
     if (!pending) return { ok: false };
+    if (await isSiteAlreadySaved(pending)) {
+      await dismissPending(tabId);
+      return { ok: true, skipped: true };
+    }
     await stagePending(pending);
     return { ok: true };
   }

@@ -42,6 +42,18 @@ export function recordMatchesPage(
   return true;
 }
 
+/**
+ * Exact hostname + scheme only (same rule as autofill).
+ * Any login for that host+scheme means the site is already in the vault:
+ * github.com does not cover gist.github.com; https does not cover http.
+ */
+export function siteAlreadyInVault(
+  pending: Pick<PageTarget, 'host' | 'scheme'>,
+  records: Array<Pick<LoginRecord, 'host' | 'scheme'>>,
+): boolean {
+  return records.some((row) => row.host === pending.host && row.scheme === pending.scheme);
+}
+
 export function toLoginTarget(
   rawUrl: string,
   title?: string,
