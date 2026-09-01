@@ -5,7 +5,7 @@ import {
   unlockDekFromMeta,
 } from '../src/lib/vault/crypto.ts';
 import { bytesToUtf8 } from '../src/lib/vault/encoding.ts';
-import { parsePageTarget, recordMatchesPage, siteAlreadyInVault } from '../src/lib/vault/match.ts';
+import { displayHost, parsePageTarget, recordMatchesPage, siteAlreadyInVault } from '../src/lib/vault/match.ts';
 import type { LoginRecord } from '../src/lib/vault/types.ts';
 import {
   asPendingMap,
@@ -82,18 +82,59 @@ assert(
   'exact evil.com should match itself',
 );
 
-assert(siteAlreadyInVault(gh, [record]), 'same host+scheme is already in the vault');
+assert(siteAlreadyInVault(gh, [record]), 'same origin is already in the vault');
 assert(
-  siteAlreadyInVault(gh, [{ host: 'github.com', scheme: 'https:' }]),
-  'any login for that host+scheme suppresses, regardless of username',
+  siteAlreadyInVault(gh, [{ host: 'github.com', scheme: 'https:', origin: 'https://github.com' }]),
+  'any login for that origin suppresses, regardless of username',
 );
 assert(!siteAlreadyInVault(gist, [record]), 'github.com must not suppress gist.github.com');
 assert(!siteAlreadyInVault(httpGh, [record]), 'https must not suppress http');
 assert(!siteAlreadyInVault(gh, []), 'empty records must not suppress');
 assert(
-  !siteAlreadyInVault(gh, [{ host: 'github.com', scheme: 'http:' }]),
+  !siteAlreadyInVault(gh, [{ host: 'github.com', scheme: 'http:', origin: 'http://github.com' }]),
   'http record must not suppress https pending',
 );
+
+const lan8080 = parsePageTarget('http://192.168.1.1:8080/login')!;
+const lan3000 = parsePageTarget('http://192.168.1.1:3000/login')!;
+const recLan8080 = { host: lan8080.host, scheme: lan8080.scheme, origin: lan8080.origin };
+assert(lan8080.origin === 'http://192.168.1.1:8080', 'non-default port stays in origin');
+assert(lan3000.origin === 'http://192.168.1.1:3000', 'other non-default port is a different origin');
+assert(!recordMatchesPage(recLan8080, lan3000), 'same IP different ports must not match/fill');
+assert(!siteAlreadyInVault(lan3000, [recLan8080]), 'same IP different ports must not suppress');
+assert(recordMatchesPage(recLan8080, lan8080), 'same IP+port should match itself');
+assert(displayHost(lan8080) === '192.168.1.1:8080', 'display host includes non-default port');
+
+const loop3000 = parsePageTarget('http://127.0.0.1:3000/')!;
+const loopDefault = parsePageTarget('http://127.0.0.1/')!;
+const loop80 = parsePageTarget('http://127.0.0.1:80/')!;
+const recLoop3000 = { host: loop3000.host, scheme: loop3000.scheme, origin: loop3000.origin };
+const recLoopDefault = { host: loopDefault.host, scheme: loopDefault.scheme, origin: loopDefault.origin };
+assert(loopDefault.origin === 'http://127.0.0.1', 'http default origin omits :80');
+assert(loop80.origin === 'http://127.0.0.1', 'http :80 origin equals omitted port');
+assert(loop3000.origin === 'http://127.0.0.1:3000', 'http :3000 origin keeps port');
+assert(!recordMatchesPage(recLoop3000, loopDefault), '127.0.0.1:3000 must not match default 80');
+assert(!recordMatchesPage(recLoop3000, loop80), '127.0.0.1:3000 must not match :80');
+assert(!siteAlreadyInVault(loopDefault, [recLoop3000]), ':3000 must not suppress default 80');
+assert(!siteAlreadyInVault(loop80, [recLoop3000]), ':3000 must not suppress :80');
+
+const httpsEx = parsePageTarget('https://example.com/login')!;
+const https443 = parsePageTarget('https://example.com:443/login')!;
+const recHttpsEx = { host: httpsEx.host, scheme: httpsEx.scheme, origin: httpsEx.origin };
+assert(httpsEx.origin === 'https://example.com', 'https default origin omits :443');
+assert(https443.origin === 'https://example.com', 'https :443 origin equals omitted port');
+assert(recordMatchesPage(recHttpsEx, https443), 'https://example.com must match :443');
+assert(siteAlreadyInVault(https443, [recHttpsEx]), 'https default must suppress :443');
+assert(displayHost(httpsEx) === 'example.com', 'display host omits default 443');
+
+const httpEx = parsePageTarget('http://example.com/login')!;
+const http80 = parsePageTarget('http://example.com:80/login')!;
+const recHttpEx = { host: httpEx.host, scheme: httpEx.scheme, origin: httpEx.origin };
+assert(httpEx.origin === 'http://example.com', 'http default origin omits :80');
+assert(http80.origin === 'http://example.com', 'http :80 origin equals omitted port');
+assert(recordMatchesPage(recHttpEx, http80), 'http://example.com must match :80');
+assert(siteAlreadyInVault(http80, [recHttpEx]), 'http default must suppress :80');
+assert(recordMatchesPage(recLoopDefault, loop80), '127.0.0.1 omitted must match :80');
 
 console.log('verify-vault: ok');
 
@@ -170,7 +211,7 @@ assert(
 
 console.log('verify-vault pending: ok');
 
-const already = [{ host: loginPending.host, scheme: loginPending.scheme }];
+const already = [{ host: loginPending.host, scheme: loginPending.scheme, origin: loginPending.origin }];
 const skippedStage = pendingMapAfterStage({ '11': loginPending }, loginPending, siteAlreadyInVault(loginPending, already));
 assert(skippedStage.skipped, 'existing site STAGE is skipped');
 assert(!skippedStage.map['11'], 'skipped STAGE does not belong in pending map');

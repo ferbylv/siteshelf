@@ -9,6 +9,7 @@ import { SetupForm } from './SetupForm';
 import { UnlockForm } from './UnlockForm';
 import { getActiveTab } from '../../lib/capture';
 import { maskPassword } from '../../lib/vault/encoding';
+import { displayHost } from '../../lib/vault/match';
 import {
   deleteLogin,
   listLogins,
@@ -186,9 +187,9 @@ export function VaultLibrary() {
             <div className="item-head">
               <Favicon src="" title={item.title} url={item.url} />
               <div className="preview-body">
-                <h2 className="item-title">{item.title || item.host}</h2>
+                <h2 className="item-title">{item.title || displayHost(item)}</h2>
                 <p className="item-summary">
-                  {item.username} · {item.host}
+                  {item.username} · {displayHost(item)}
                 </p>
               </div>
             </div>

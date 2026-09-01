@@ -1,4 +1,4 @@
-import { summarize } from './match';
+import { displayHost, summarize } from './match';
 import { mergePendingForSave, stagePendingFromSender } from './pending';
 import {
   dismissPending,
@@ -91,7 +91,7 @@ export async function handleVaultMessage(
     if (!pending) return { ok: false, error: '没有可保存的登录。' };
     try {
       await saveLogin({
-        title: pending.host,
+        title: displayHost(pending),
         origin: pending.origin,
         host: pending.host,
         scheme: pending.scheme,

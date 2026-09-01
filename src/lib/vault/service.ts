@@ -15,7 +15,7 @@ import {
   putVaultMeta,
   replaceAllRecords,
 } from './db';
-import { parsePageTarget, recordMatchesPage, siteAlreadyInVault, summarize, toLoginTarget, type PageTarget } from './match';
+import { displayHost, parsePageTarget, recordMatchesPage, siteAlreadyInVault, summarize, toLoginTarget, type PageTarget } from './match';
 import { isFreshPending, pendingForTab } from './pending';
 import {
   clearPendingSave,
@@ -57,15 +57,15 @@ export class VaultError extends Error {
 
 const WRONG = '主密码不正确，请重试。';
 
-/** Host+scheme only. Never store usernames or passwords here. */
+/** Origin only (scheme+host+port). Never store usernames or passwords here. */
 const SAVED_HOSTS_KEY = 'siteshelf.vault.savedHosts';
 
-function savedHostKey(row: Pick<PageTarget, 'host' | 'scheme'>): string {
-  return `${row.scheme}//${row.host}`;
+function savedHostKey(row: Pick<PageTarget, 'origin'>): string {
+  return row.origin;
 }
 
-function hostsFromRecords(records: Array<Pick<LoginRecord, 'host' | 'scheme'>>): string[] {
-  return [...new Set(records.map(savedHostKey))].sort();
+function hostsFromRecords(records: Array<Pick<LoginRecord, 'origin'>>): string[] {
+  return [...new Set(records.map(savedHostKey).filter(Boolean))].sort();
 }
 
 async function readSavedHostIndex(): Promise<string[]> {
@@ -80,7 +80,7 @@ async function readSavedHostIndex(): Promise<string[]> {
 }
 
 async function writeSavedHostIndex(
-  records: Array<Pick<LoginRecord, 'host' | 'scheme'>>,
+  records: Array<Pick<LoginRecord, 'origin'>>,
 ): Promise<void> {
   try {
     await browser.storage.local.set({ [SAVED_HOSTS_KEY]: hostsFromRecords(records) });
@@ -98,13 +98,15 @@ async function clearSavedHostIndex(): Promise<void> {
 }
 
 /**
- * True when any vault login already exists for this host+scheme.
- * Unlocked: decrypt and refresh the host index.
- * Locked: consult the host index only (never decrypt). Empty/missing index
+ * True when any vault login already exists for this origin (scheme+host+port).
+ * Unlocked: decrypt and refresh the origin index.
+ * Locked: consult the index only (never decrypt). Empty/missing index
  * does not suppress, so a first-time save while locked still prompts.
+ * Portless keys from older builds equal default-port origins
+ * (`https://github.com`) and do not cover non-default ports.
  */
 export async function isSiteAlreadySaved(
-  pending: Pick<PageTarget, 'host' | 'scheme'>,
+  pending: Pick<PageTarget, 'origin' | 'host' | 'scheme'>,
 ): Promise<boolean> {
   const dek = await loadSessionDek();
   if (dek) {
@@ -114,7 +116,7 @@ export async function isSiteAlreadySaved(
       await writeSavedHostIndex(all);
       return siteAlreadyInVault(pending, all);
     } catch {
-      /* fall through to the host index rather than blocking STAGE */
+      /* fall through to the origin index rather than blocking STAGE */
     }
   }
   const index = await readSavedHostIndex();
@@ -260,16 +262,13 @@ export async function saveLogin(draft: LoginDraft): Promise<LoginRecord> {
   if (draft.id) existing = all.find((row) => row.id === draft.id);
   if (!existing) {
     existing = all.find(
-      (row) =>
-        row.host === target.host &&
-        row.scheme === target.scheme &&
-        row.username === draft.username,
+      (row) => row.origin === target.origin && row.username === draft.username,
     );
   }
 
   const record: LoginRecord = {
     id: existing?.id ?? crypto.randomUUID(),
-    title: (draft.title || target.title).trim() || target.host,
+    title: (draft.title || target.title).trim() || displayHost(target),
     origin: target.origin,
     host: target.host,
     scheme: target.scheme,
@@ -317,7 +316,7 @@ export async function matchesForUrl(pageUrl: string): Promise<LoginRecord[]> {
   if (!dek) return [];
   await touchActivity();
   const all = await decryptAll(dek);
-  return all.filter((row) => recordMatchesPage(row, page, 'host'));
+  return all.filter((row) => recordMatchesPage(row, page));
 }
 
 export async function fillPayloadFor(
@@ -331,7 +330,7 @@ export async function fillPayloadFor(
   await touchActivity();
   const record = (await decryptAll(dek)).find((row) => row.id === id);
   if (!record) return null;
-  if (!recordMatchesPage(record, page, 'host')) return null;
+  if (!recordMatchesPage(record, page)) return null;
   return { username: record.username, password: record.password };
 }
 
@@ -362,7 +361,7 @@ export async function confirmPendingSave(tabId: number): Promise<LoginRecord | u
   const pending = await readPending(tabId);
   if (!pending) return undefined;
   const saved = await saveLogin({
-    title: pending.host,
+    title: displayHost(pending),
     origin: pending.origin,
     host: pending.host,
     scheme: pending.scheme,

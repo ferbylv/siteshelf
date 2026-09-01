@@ -7,6 +7,8 @@ export interface PageTarget {
   scheme: LoginScheme;
 }
 
+export type SiteIdentity = Pick<PageTarget, 'origin' | 'host' | 'scheme'>;
+
 export function parsePageTarget(raw: string | undefined | null): PageTarget | null {
   if (!raw) return null;
   try {
@@ -25,7 +27,24 @@ export function parsePageTarget(raw: string | undefined | null): PageTarget | nu
 }
 
 /**
- * Exact hostname + scheme match only.
+ * Hostname plus :port when the port is non-default.
+ * Default 80 (http) / 443 (https) are omitted, matching URL origin.
+ */
+export function displayHost(page: Pick<SiteIdentity, 'host' | 'origin'>): string {
+  if (!page.origin) return page.host;
+  try {
+    const port = new URL(page.origin).port;
+    return port ? `${page.host}:${port}` : page.host;
+  } catch {
+    return page.host;
+  }
+}
+
+/**
+ * Exact origin match: scheme + host + port (URL origin semantics).
+ * Non-default ports are distinct (8080 ≠ 3000).
+ * Default ports equal omitted: https://example.com === https://example.com:443;
+ * http://host === http://host:80.
  * github.com does not fill gist.github.com.
  * evil.com does not fill a.evil.com.
  * https records never fill http pages.
@@ -33,25 +52,26 @@ export function parsePageTarget(raw: string | undefined | null): PageTarget | nu
  */
 export function recordMatchesPage(
   record: Pick<LoginRecord, 'host' | 'scheme' | 'origin'>,
-  page: PageTarget,
-  mode: 'host' | 'origin' = 'host',
+  page: SiteIdentity,
 ): boolean {
+  if (!record.origin || !page.origin) return false;
+  if (record.origin !== page.origin) return false;
   if (record.host !== page.host) return false;
   if (record.scheme !== page.scheme) return false;
-  if (mode === 'origin' && record.origin !== page.origin) return false;
   return true;
 }
 
 /**
- * Exact hostname + scheme only (same rule as autofill).
- * Any login for that host+scheme means the site is already in the vault:
- * github.com does not cover gist.github.com; https does not cover http.
+ * Exact origin only (same rule as autofill).
+ * Any login for that origin means the site is already in the vault:
+ * github.com does not cover gist.github.com; https does not cover http;
+ * :8080 does not cover :3000.
  */
 export function siteAlreadyInVault(
-  pending: Pick<PageTarget, 'host' | 'scheme'>,
-  records: Array<Pick<LoginRecord, 'host' | 'scheme'>>,
+  pending: SiteIdentity,
+  records: Array<Pick<LoginRecord, 'host' | 'scheme' | 'origin'>>,
 ): boolean {
-  return records.some((row) => row.host === pending.host && row.scheme === pending.scheme);
+  return records.some((row) => recordMatchesPage(row, pending));
 }
 
 export function toLoginTarget(
@@ -61,7 +81,7 @@ export function toLoginTarget(
   const page = parsePageTarget(rawUrl);
   if (!page) return null;
   let derivedTitle = title?.trim() || '';
-  if (!derivedTitle) derivedTitle = page.host;
+  if (!derivedTitle) derivedTitle = displayHost(page);
   return {
     title: derivedTitle,
     origin: page.origin,

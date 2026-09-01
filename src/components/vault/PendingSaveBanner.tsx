@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { maskPassword } from '../../lib/vault/encoding';
+import { displayHost } from '../../lib/vault/match';
 import { confirmPendingSave, dismissPending } from '../../lib/vault/service';
 import type { PendingSave } from '../../lib/vault/types';
 
@@ -20,7 +21,7 @@ export function PendingSaveBanner({
     <div className="pending-banner">
       <h2>保存到页架</h2>
       <p>
-        将写入 <strong>{pending.origin}</strong>（{pending.host}）
+        将写入 <strong>{pending.origin}</strong>（{displayHost(pending)}）
         <br />
         用户名 {pending.username} · 密码 {maskPassword(pending.password)}
       </p>

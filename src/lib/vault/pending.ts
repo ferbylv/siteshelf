@@ -70,6 +70,7 @@ export function pendingForTab(
 
 /**
  * STAGE: captured origin/host/scheme must match the page that sent the form.
+ * Origin includes port (URL origin semantics); different ports are different sites.
  * tabId is taken from the sender, never from the page payload.
  */
 export function stagePendingFromSender(

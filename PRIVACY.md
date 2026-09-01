@@ -26,7 +26,7 @@ SiteShelf 页架（下称「本扩展」）是一款本机优先的 Chrome Manif
 - AI 设置（分类引擎、兼容接口地址、模型名）以及你填写的 **API 密钥**（仅当你启用 OpenAI 兼容分类时）。
 - 自定义分类名（`siteshelf.categories`）。
 - 保险库闲置锁定等非密钥配置（`siteshelf.vault.settings`）。
-- **主机索引**（`siteshelf.vault.savedHosts`）：仅 `scheme + host`（例如 `https://example.com`），用于在锁定时判断该站是否已有登录、避免重复提示。**不含用户名或密码。**
+- **源站索引**（`siteshelf.vault.savedHosts`）：仅 origin（`scheme + host + port`，例如 `https://example.com` 或 `http://192.168.1.1:8080`；默认 80/443 与省略端口等同），用于在锁定时判断该站是否已有登录、避免重复提示。**不含用户名或密码。**
 
 `chrome.storage.local` **从不存放登录密码。**
 
@@ -80,7 +80,7 @@ SiteShelf 页架（下称「本扩展」）是一款本机优先的 Chrome Manif
 
 - 检测用户名 + 密码登录表单；
 - 在提交后显示右上角约 360px 的「保存到页架？」提示卡（须确认）；
-- 仅当 **scheme + hostname 完全一致** 时填充（无 eTLD+1、无模糊匹配）。`github.com` 不会填充 `gist.github.com`；https 记录不会填充 http 页面。
+- 仅当 **scheme + hostname + port（origin；默认 80/443 与省略等同）完全一致** 时填充（无 eTLD+1、无模糊匹配）。`github.com` 不会填充 `gist.github.com`；https 记录不会填充 http 页面；不同端口互不填充。
 
 **不会**注入 `chrome://`、Chrome 网上应用店或其他受保护页面。主机权限**不用于**抓取、分析或广告。
 
@@ -119,7 +119,7 @@ SiteShelf 页架 is a local-first Chrome MV3 extension. **Single purpose:** a lo
 
 - **Bookmarks** in IndexedDB `siteshelf` / `bookmarks` (URL, title, description, excerpt, summary, category, tags). Fully separate from the vault. No passwords.
 - **Encrypted vault** in IndexedDB `siteshelf-vault`: PBKDF2-SHA-256 (600,000 iterations) wrapping an AES-256-GCM DEK. The master password is never stored and cannot be recovered. Ciphertext records only.
-- **chrome.storage.local:** AI settings and optional API key; custom category names; vault idle-lock settings; a **host index of scheme+host only** (no usernames/passwords). Passwords are never written to `chrome.storage.local`.
+- **chrome.storage.local:** AI settings and optional API key; custom category names; vault idle-lock settings; an **origin index of scheme+host+port only** (default 80/443 ≡ omitted; no usernames/passwords). Passwords are never written to `chrome.storage.local`.
 - **chrome.storage.session:** in-memory DEK while unlocked; pending save-on-login drafts until the user confirms 「保存到页架？」. Confirm-to-save only.
 
 ### Never transmitted
@@ -140,7 +140,7 @@ User data is used only to provide the single disclosed purpose (local page shelf
 
 ### Host permissions
 
-`http(s)://*/*` injects `vault.js` on ordinary pages to detect login forms, show a compact save prompt, and exact-host fill (hostname + scheme only; no fuzzy / eTLD+1). No injection on `chrome://` or the Chrome Web Store. Not used for analytics or scraping.
+`http(s)://*/*` injects `vault.js` on ordinary pages to detect login forms, show a compact save prompt, and exact-origin fill (hostname + scheme + port; default 80/443 ≡ omitted; no fuzzy / eTLD+1). No injection on `chrome://` or the Chrome Web Store. Not used for analytics or scraping.
 
 ### Permissions (built manifest)
 

@@ -1,6 +1,6 @@
 # Chrome Web Store 上架文案 · SiteShelf 页架
 
-供开发者控制台粘贴。产品事实须与 v2.1.0 源码及已构建 manifest 一致。
+供开发者控制台粘贴。产品事实须与 v2.1.1 源码及已构建 manifest 一致。
 
 ## 产品名称
 
@@ -43,7 +43,7 @@ SiteShelf 页架是本机页架：把正在看的网页保藏到浏览器本地�
 - 独立数据库 `siteshelf-vault`，与书签库完全分开。
 - 主密码经 PBKDF2-SHA-256（600,000 次）派生包装密钥，再用 AES-256-GCM 包裹随机数据密钥。主密码不落盘，也无法找回。
 - 登录提交后，草稿暂存在会话存储；页面右上角出现「保存到页架？」提示卡，**必须点确认才会写入**，不会静默保存。
-- 自动填充仅当 **协议 + 主机名完全一致** 时发生，不用 eTLD+1 或模糊匹配。`github.com` 不会填充 `gist.github.com`。
+- 自动填充仅当 **协议 + 主机名 + 端口（origin；默认 80/443 与省略等同）完全一致** 时发生，不用 eTLD+1 或模糊匹配。`github.com` 不会填充 `gist.github.com`。
 - 支持加密备份、Bitwarden 未加密 JSON / CSV 导入导出（未加密导出前会警告）。
 
 开源（MIT）：https://github.com/ferbylv/siteshelf
@@ -58,7 +58,7 @@ Single purpose: a local page shelf to bookmark the current page and optionally e
 
 **Optional local AI classify** — Uses on-device Chrome Prompt API when available. You may instead configure an OpenAI-compatible HTTPS endpoint; the API key stays in `chrome.storage.local` and is sent only to the URL you typed. Classify receives only public metadata (url, title, description, excerpt). **Passwords, usernames, and form values are never sent to any model.**
 
-**Encrypted vault** — Separate IndexedDB `siteshelf-vault`. PBKDF2-SHA-256 (600k) wraps an AES-256-GCM data key. The master password is never stored and cannot be recovered. Save-on-login stages a pending draft in session storage and shows 「保存到页架？」; nothing is written until you confirm. Autofill matches exact hostname + scheme only (no eTLD+1). Open-source MIT: https://github.com/ferbylv/siteshelf
+**Encrypted vault** — Separate IndexedDB `siteshelf-vault`. PBKDF2-SHA-256 (600k) wraps an AES-256-GCM data key. The master password is never stored and cannot be recovered. Save-on-login stages a pending draft in session storage and shows 「保存到页架？」; nothing is written until you confirm. Autofill matches exact hostname + scheme + port (origin; default 80/443 ≡ omitted; no eTLD+1). Open-source MIT: https://github.com/ferbylv/siteshelf
 
 ## 商店后台链接
 
@@ -84,7 +84,7 @@ Not mature（非成人内容 / Everyone）
 | Authentication information | **Yes** | 登录用户名/密码经 AES-256-GCM 加密后仅存本机；主密码不保存。我们不传输这些凭据。 |
 | Personal communications | **No** | |
 | Location | **No** | |
-| Web history | **Yes**（有限） | 仅用户主动保藏的网址，以及用户确认保存的登录所对应的 scheme+host。不是全量历史记录器，不记录未保藏的浏览。 |
+| Web history | **Yes**（有限） | 仅用户主动保藏的网址，以及用户确认保存的登录所对应的 scheme+host+port（origin）。不是全量历史记录器，不记录未保藏的浏览。 |
 | User activity | **No** | 无分析、无使用统计、无遥测。 |
 | Website content | **Yes** | 保藏时读取当前页公开元数据用于分类；登录表单字段仅在用户提交后用于保存提示，且须确认才写入保险库。 |
 | Remote code | **No** | 无远程代码；无 eval 加载的远程脚本。可选的 OpenAI 兼容调用只把元数据 POST 到用户填写的 HTTPS 地址。 |
@@ -94,9 +94,9 @@ Not mature（非成人内容 / Everyone）
 
 ### storage
 
-**中文：** 用于在本机持久化书签相关设置、AI 配置（含你填写的 API 密钥）、自定义分类、保险库加密元数据与 scheme+host 主机索引、以及会话内的解锁状态和待确认保存草稿。登录密码不写入 `chrome.storage.local`（密码只以密文进入独立 IndexedDB，待保存草稿只在 `chrome.storage.session`）。
+**中文：** 用于在本机持久化书签相关设置、AI 配置（含你填写的 API 密钥）、自定义分类、保险库加密元数据与 scheme+host+port 源站索引、以及会话内的解锁状态和待确认保存草稿。登录密码不写入 `chrome.storage.local`（密码只以密文进入独立 IndexedDB，待保存草稿只在 `chrome.storage.session`）。
 
-**English:** Persist bookmark settings, AI config (including a user-supplied API key), custom categories, vault crypto metadata and a scheme+host index, plus session unlock state and pending save drafts. Passwords are never stored in `chrome.storage.local`.
+**English:** Persist bookmark settings, AI config (including a user-supplied API key), custom categories, vault crypto metadata and a scheme+host+port origin index, plus session unlock state and pending save drafts. Passwords are never stored in `chrome.storage.local`.
 
 ### activeTab + scripting
 
@@ -118,17 +118,17 @@ Not mature（非成人内容 / Everyone）
 
 ### host_permissions `https://*/*` and `http://*/*`
 
-**中文：** 在普通 http(s) 网页注入内容脚本，用于检测登录表单、显示紧凑的「保存到页架？」卡片，以及仅在主机名与协议完全一致时自动填充。不用于分析、广告或抓取全站。无法注入 `chrome://` 与 Chrome 网上应用店。作为可在任意网站工作的本机密码保险库，需要匹配所有普通网页，而不是预设域名列表。
+**中文：** 在普通 http(s) 网页注入内容脚本，用于检测登录表单、显示紧凑的「保存到页架？」卡片，以及仅在主机名、协议与端口（origin）完全一致时自动填充。不用于分析、广告或抓取全站。无法注入 `chrome://` 与 Chrome 网上应用店。作为可在任意网站工作的本机密码保险库，需要匹配所有普通网页，而不是预设域名列表。
 
-**English:** Inject the content script on ordinary http(s) pages to detect login forms, show a compact save card, and exact-host autofill. Not used for analytics, ads, or scraping. Cannot inject on `chrome://` or the Chrome Web Store. Broad hosts are required because this is a password manager that must work on any site the user visits, not a fixed allow-list.
+**English:** Inject the content script on ordinary http(s) pages to detect login forms, show a compact save card, and exact-origin autofill (hostname + scheme + port). Not used for analytics, ads, or scraping. Cannot inject on `chrome://` or the Chrome Web Store. Broad hosts are required because this is a password manager that must work on any site the user visits, not a fixed allow-list.
 
 ## Review notes for Google (English)
 
-SiteShelf 页架 is a **local-first, open-source** (MIT) Chrome MV3 extension. Source: https://github.com/ferbylv/siteshelf (developer: ferbylv). Version 2.1.0.
+SiteShelf 页架 is a **local-first, open-source** (MIT) Chrome MV3 extension. Source: https://github.com/ferbylv/siteshelf (developer: ferbylv). Version 2.1.1.
 
 **Single purpose:** a local page shelf — bookmark/classify the current page, and optionally encrypt/fill logins for that site.
 
-The vault (IndexedDB `siteshelf-vault`) is fully separate from bookmarks (`siteshelf`/`bookmarks`). Credentials use PBKDF2-SHA-256 (600k) and AES-256-GCM. The master password is never stored. **Passwords, usernames, and form values are never sent to Prompt API, OpenAI, or any model** — classify is public metadata only. Confirm-to-save only (pending draft in `chrome.storage.session`). Autofill is exact hostname + scheme; no eTLD+1.
+The vault (IndexedDB `siteshelf-vault`) is fully separate from bookmarks (`siteshelf`/`bookmarks`). Credentials use PBKDF2-SHA-256 (600k) and AES-256-GCM. The master password is never stored. **Passwords, usernames, and form values are never sent to Prompt API, OpenAI, or any model** — classify is public metadata only. Confirm-to-save only (pending draft in `chrome.storage.session`). Autofill is exact hostname + scheme + port (origin; default 80/443 ≡ omitted); no eTLD+1.
 
 **Why `<all_urls>`-style host permissions:** the content script (`vault.js`) must run on whatever http(s) page the user is logging into, like any password manager. We do not scrape, advertise, or analytics. `chrome://` and the Web Store cannot be injected.
 

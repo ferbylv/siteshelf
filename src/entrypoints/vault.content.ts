@@ -309,7 +309,7 @@ async function fillById(shadow: ShadowRoot, id: string): Promise<void> {
     showDialog(shadow, {
       kind: 'info',
       title: '无法填充',
-      body: '请先解锁保险库，并确认当前网站与保存的主机名完全一致。',
+      body: '请先解锁保险库，并确认当前网站与保存的源站（主机名、协议和端口）完全一致。',
     });
 }
 
@@ -485,7 +485,7 @@ function showSavePrompt(shadow: ShadowRoot, pending: Omit<PendingSave, 'tabId'>)
   wrapOf(shadow).querySelector('[data-dialog="save"]')?.remove();
   const httpWarn =
     pending.scheme === 'http:'
-      ? '当前为 HTTP，连接未加密。保存后也只会填充到同一主机的 HTTP 页面。'
+      ? '当前为 HTTP，连接未加密。保存后也只会填充到同一主机和端口的 HTTP 页面。'
       : '';
   const bar = document.createElement('div');
   bar.className = 'infobar';

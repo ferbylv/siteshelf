@@ -1,6 +1,6 @@
 import { csvCell, csvHeaderMap, parseCsv } from './csv';
 import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../vault/encoding';
-import { parsePageTarget } from '../vault/match';
+import { displayHost, parsePageTarget } from '../vault/match';
 import type {
   LoginDraft,
   LoginRecord,
@@ -182,7 +182,7 @@ function draftFromParts(
   const page = parsePageTarget(url);
   if (!page) return null;
   return {
-    title: title.trim() || page.host,
+    title: title.trim() || displayHost(page),
     origin: page.origin,
     host: page.host,
     scheme: page.scheme,

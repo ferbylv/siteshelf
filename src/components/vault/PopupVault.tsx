@@ -4,7 +4,7 @@ import { SetupForm } from './SetupForm';
 import { UnlockForm } from './UnlockForm';
 import { getActiveTab } from '../../lib/capture';
 import { maskPassword } from '../../lib/vault/encoding';
-import { parsePageTarget } from '../../lib/vault/match';
+import { parsePageTarget, recordMatchesPage } from '../../lib/vault/match';
 import {
   lockVaultNow,
   matchesForUrl,
@@ -68,8 +68,8 @@ export function PopupVault() {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) throw new Error('no-tab');
       const page = parsePageTarget(tab.url);
-      if (!page || page.host !== record.host || page.scheme !== record.scheme) {
-        setMessage('当前页面与保存的主机不一致，已取消填充。');
+      if (!page || !recordMatchesPage(record, page)) {
+        setMessage('当前页面与保存的源站不一致，已取消填充。');
         return;
       }
       await browser.tabs.sendMessage(tab.id, {

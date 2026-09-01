@@ -3,7 +3,7 @@
   "displayName": "SiteShelf 页架",
   "description": "保藏网页并生成本地分类；另含本机加密保险库与精确主机自动填充。",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.1.1",
   "type": "module",
   "scripts": {
     "dev": "wxt",
