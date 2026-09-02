@@ -221,3 +221,40 @@ assert(!newSiteStage.skipped, 'new site STAGE is not skipped');
 assert(newSiteStage.map['11']?.host === 'login.example.com', 'new site STAGE still persists pending');
 
 console.log('verify-vault skip-existing: ok');
+
+import {
+  looksLikeCancelActivationLabel,
+  looksLikeConfirmOnlyLabel,
+  looksLikeLoginActivationLabel,
+  normalizeActivationLabel,
+  shouldDebounceStage,
+} from '../src/lib/vault/capture.ts';
+
+assert(looksLikeLoginActivationLabel('登录'), '登录 is login label');
+assert(looksLikeLoginActivationLabel('登陆'), '登陆 is login label');
+assert(looksLikeLoginActivationLabel('登入'), '登入 is login label');
+assert(looksLikeLoginActivationLabel('Login'), 'Login is login label');
+assert(looksLikeLoginActivationLabel('Sign in'), 'Sign in is login label');
+assert(looksLikeLoginActivationLabel('Sign In'), 'Sign In is login label');
+assert(looksLikeLoginActivationLabel('Log in'), 'Log in is login label');
+assert(looksLikeLoginActivationLabel('Submit'), 'Submit is login label');
+assert(!looksLikeLoginActivationLabel('确定'), 'bare 确定 is not a login label alone');
+assert(looksLikeConfirmOnlyLabel('确定'), '确定 is confirm-only');
+assert(looksLikeConfirmOnlyLabel('OK'), 'OK is confirm-only');
+assert(looksLikeCancelActivationLabel('取消'), '取消 is cancel');
+assert(looksLikeCancelActivationLabel('Cancel'), 'Cancel is cancel');
+assert(!looksLikeLoginActivationLabel('取消'), '取消 must not look like login');
+assert(normalizeActivationLabel('  Sign   in  ') === 'Sign in', 'normalize collapses space');
+
+let deb = { key: '', at: 0 };
+const d1 = shouldDebounceStage(deb, 'https://a.example', 'u', 1000, 1000);
+assert(!d1.skip, 'first STAGE is not debounced');
+deb = d1.next;
+const d2 = shouldDebounceStage(deb, 'https://a.example', 'u', 1500, 1000);
+assert(d2.skip, 'duplicate STAGE within 1s is debounced');
+const d3 = shouldDebounceStage(deb, 'https://a.example', 'u', 2100, 1000);
+assert(!d3.skip, 'STAGE after window is allowed');
+const d4 = shouldDebounceStage(d3.next, 'https://a.example', 'other', 2200, 1000);
+assert(!d4.skip, 'different username is not debounced');
+
+console.log('verify-vault capture-labels: ok');

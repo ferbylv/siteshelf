@@ -1,6 +1,6 @@
 # Chrome Web Store 上架文案 · SiteShelf 页架
 
-供开发者控制台粘贴。产品事实须与 v2.1.1 源码及已构建 manifest 一致。
+供开发者控制台粘贴。产品事实须与 v2.1.2 源码及已构建 manifest 一致。
 
 ## 产品名称
 
@@ -42,7 +42,7 @@ SiteShelf 页架是本机页架：把正在看的网页保藏到浏览器本地�
 **加密保险库**
 - 独立数据库 `siteshelf-vault`，与书签库完全分开。
 - 主密码经 PBKDF2-SHA-256（600,000 次）派生包装密钥，再用 AES-256-GCM 包裹随机数据密钥。主密码不落盘，也无法找回。
-- 登录提交后，草稿暂存在会话存储；页面右上角出现「保存到页架？」提示卡，**必须点确认才会写入**，不会静默保存。
+- 登录提交或点击登录按钮后，草稿暂存在会话存储；页面右上角出现「保存到页架？」提示卡，**必须点确认才会写入**，不会静默保存。
 - 自动填充仅当 **协议 + 主机名 + 端口（origin；默认 80/443 与省略等同）完全一致** 时发生，不用 eTLD+1 或模糊匹配。`github.com` 不会填充 `gist.github.com`。
 - 支持加密备份、Bitwarden 未加密 JSON / CSV 导入导出（未加密导出前会警告）。
 
@@ -124,7 +124,7 @@ Not mature（非成人内容 / Everyone）
 
 ## Review notes for Google (English)
 
-SiteShelf 页架 is a **local-first, open-source** (MIT) Chrome MV3 extension. Source: https://github.com/ferbylv/siteshelf (developer: ferbylv). Version 2.1.1.
+SiteShelf 页架 is a **local-first, open-source** (MIT) Chrome MV3 extension. Source: https://github.com/ferbylv/siteshelf (developer: ferbylv). Version 2.1.2.
 
 **Single purpose:** a local page shelf — bookmark/classify the current page, and optionally encrypt/fill logins for that site.
 

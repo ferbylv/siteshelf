@@ -1,4 +1,11 @@
 import {
+  findPasswordForActivation,
+  isVaultHostEvent,
+  resolveActivationControl,
+  shouldDebounceStage,
+  type StageDebounceState,
+} from '../lib/vault/capture';
+import {
   VAULT_MSG,
   VAULT_PENDING_MESSAGE,
   VAULT_SESSION_MESSAGE,
@@ -131,6 +138,8 @@ async function boot(): Promise<void> {
     },
     true,
   );
+  // SPA / Ant Design: Login is often <button type="button"> + AJAX — no native submit.
+  document.addEventListener('click', (ev) => onLoginActivationClick(ev, shadow), true);
 
   const flushStage = () => {
     if (!lastCapture) return;
@@ -405,6 +414,17 @@ function fillForm(username: string, password: string): void {
   setNativeValue(pass, password);
 }
 
+let stageDebounce: StageDebounceState = { key: '', at: 0 };
+
+function onLoginActivationClick(ev: Event, shadow: ShadowRoot): void {
+  if (isVaultHostEvent(ev, ROOT_ID)) return;
+  const control = resolveActivationControl(ev.target, ROOT_ID);
+  if (!control) return;
+  const pass = findPasswordForActivation(control);
+  if (!pass) return;
+  captureFromPassword(pass, shadow);
+}
+
 function onSubmit(ev: Event, shadow: ShadowRoot): void {
   const form = ev.target;
   if (!(form instanceof HTMLFormElement)) return;
@@ -458,6 +478,9 @@ function captureFromPassword(pass: HTMLInputElement, shadow: ShadowRoot): void {
     password,
     capturedAt: Date.now(),
   };
+  const debounced = shouldDebounceStage(stageDebounce, pending.origin, pending.username);
+  stageDebounce = debounced.next;
+  if (debounced.skip) return;
   stageNow(pending, shadow);
 }
 
